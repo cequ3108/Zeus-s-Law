@@ -1,0 +1,43 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap narrow">
+  <h1>發布互助</h1>
+  <% if (user.blocked) { %>
+    <p class="flash flash-err">你的帳號已被封鎖，不能發布。</p>
+  <% } else { %>
+    <p>描述一定要填。金額是標示用的功德，1 功德等於 1 元新台幣。真正結算時，取雙方認定的較低者。</p>
+    <form method="post" action="/posts">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <fieldset class="field">
+        <legend>這則是</legend>
+        <% if (user.role === 'org') { %>
+          <input type="hidden" name="kind" value="need">
+          <p>福利機構只能發布「我需要」。幫忙的人獲得功德，由機構付出。</p>
+        <% } else { %>
+          <label class="choice"><input type="radio" name="kind" value="offer" required> 我可以提供</label>
+          <label class="choice"><input type="radio" name="kind" value="need" required> 我需要</label>
+        <% } %>
+      </fieldset>
+      <div class="field">
+        <label for="category">種類</label>
+        <select id="category" name="category" required>
+          <option value="">請選擇</option>
+          <option value="food">食物</option>
+          <option value="transport">交通</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="amount">標示金額（功德／新台幣）</label>
+        <input id="amount" name="amount" inputmode="numeric" min="1" step="1" required>
+        <p class="hint">一般使用者若是付出功德的一方，功德減去這個金額後必須大於 0，才接得成。</p>
+      </div>
+      <div class="field">
+        <label for="description">描述</label>
+        <textarea id="description" name="description" required maxlength="1000" placeholder="需要什麼、可以提供什麼、在哪個區域、大約什麼時候。"></textarea>
+      </div>
+      <button type="submit">發布</button>
+    </form>
+  <% } %>
+</main>
+<%- include('partials/footer') %>

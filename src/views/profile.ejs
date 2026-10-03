@@ -1,0 +1,44 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap">
+  <h1><%= profile.user.display_name %></h1>
+  <p class="meta">
+    <%= roleLabel(profile.user.role) %>
+    · 加入於 <%= formatTaipei(profile.user.created_at) %>
+    <% if (profile.user.blocked) { %> · 此帳號已被封鎖，不能發布或接下<% } %>
+  </p>
+  <% if (own) { %>
+    <section class="balances" aria-label="我的餘額">
+      <article class="card balance">
+        <p>功德額度</p>
+        <strong data-quota="<%= own.quota %>"><%= formatMerit(own.quota) %></strong>
+      </article>
+      <article class="card balance">
+        <p>功德</p>
+        <strong data-merit="<%= own.merit %>"><%= formatMerit(own.merit) %></strong>
+      </article>
+    </section>
+  <% } %>
+  <section class="card" data-rating-count="<%= profile.ratingCount %>" data-rating-avg="<%= profile.ratingAvg == null ? '' : profile.ratingAvg %>">
+    <h2>星等</h2>
+    <% if (profile.ratingCount) { %>
+      <p class="stars big-stars"><%= starGlyph(profile.ratingAvg) %></p>
+      <p>平均 <%= profile.ratingAvg %> / 5，共 <%= profile.ratingCount %> 則。</p>
+    <% } else { %>
+      <p>尚無星等。</p>
+    <% } %>
+  </section>
+  <% if (profile.ratings.length) { %>
+    <h2>收到的星等</h2>
+    <% profile.ratings.forEach(function (rating) { %>
+      <article class="card">
+        <p class="stars"><%= starGlyph(rating.stars) %> <%= rating.stars %> 星</p>
+        <p class="meta">
+          <a href="/users/<%= rating.rater_id %>"><%= rating.rater_name %></a>
+          · <%= formatTaipei(rating.created_at) %>
+        </p>
+      </article>
+    <% }) %>
+  <% } %>
+</main>
+<%- include('partials/footer') %>

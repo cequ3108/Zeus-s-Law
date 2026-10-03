@@ -1,0 +1,120 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap">
+  <p class="meta">
+    <span class="tag tag-<%= model.kind %>"><%= kindLabel(model.kind) %></span>
+    <span class="tag"><%= categoryLabel(model.category) %></span>
+    <span><%= statusLabel(model.status) %></span>
+    <span><%= formatTaipei(model.createdAt) %></span>
+  </p>
+  <h1><%= kindLabel(model.kind) %></h1>
+  <p class="amount-line">標示 <strong><%= formatMerit(model.amount) %></strong> 功德</p>
+  <p class="description"><%= model.description %></p>
+  <p class="meta">
+    發布者
+    <a href="/users/<%= model.author.id %>"><%= model.author.name %></a>
+    · <%= roleLabel(model.author.role) %>
+    <% if (model.author.ratingCount) { %>
+      · <span class="stars"><%= starGlyph(model.author.ratingAvg) %></span> <%= model.author.ratingAvg %>
+    <% } else { %>
+      · 尚無星等
+    <% } %>
+    <% if (model.author.blocked) { %> · 已封鎖<% } %>
+  </p>
+
+  <% if (model.status === 'open') { %>
+    <% if (model.canCancel) { %>
+      <form method="post" action="/posts/<%= model.id %>/cancel">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="secondary" type="submit">取消這則貼文</button>
+      </form>
+    <% } else if (model.canAccept) { %>
+      <form method="post" action="/posts/<%= model.id %>/accept">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button type="submit">接下這則</button>
+      </form>
+    <% } else if (model.acceptHint) { %>
+      <p class="flash flash-err"><%= model.acceptHint %></p>
+    <% } else if (!model.loggedIn) { %>
+      <p><a class="button" href="/login?next=/posts/<%= model.id %>">登入後接下</a></p>
+    <% } else if (model.isAuthor) { %>
+      <p class="hint">這是你發的。等別人來接。</p>
+    <% } %>
+  <% } %>
+
+  <% if (model.host && model.seeker) { %>
+    <section class="card">
+      <h2>雙方</h2>
+      <p>提供幫助的人（收入功德）：<a href="/users/<%= model.host.id %>"><%= model.host.name %></a> · <%= roleLabel(model.host.role) %></p>
+      <p>接受幫助的人（支出功德）：<a href="/users/<%= model.seeker.id %>"><%= model.seeker.name %></a> · <%= roleLabel(model.seeker.role) %></p>
+      <% if (model.kind === 'need' && model.author.role === 'org') { %>
+        <p class="hint">這則是福利機構的需要。功德由機構付出，幫忙的人獲得。</p>
+      <% } %>
+      <% if (model.seeker.merit != null) { %>
+        <p class="hint">接受幫助的人目前功德是 <%= formatMerit(model.seeker.merit) %>。結算不能高過這個數字，否則餘額會變成負數。</p>
+      <% } %>
+    </section>
+  <% } %>
+
+  <% if (model.showBothValues) { %>
+    <section class="card" data-settled="<%= model.settledAmount %>">
+      <h2>結算 <%= formatMerit(model.settledAmount) %> 功德</h2>
+      <p>提供幫助的人填了 <%= formatMerit(model.hostValue) %>，接受幫助的人填了 <%= formatMerit(model.seekerValue) %>。有一方是 0 時結算為 0，否則取較低者。</p>
+      <p class="hint">台北時間 <%= model.settledOn %>。雙方功德額度各增加這個金額。同一對帳號同一天不能再結算。</p>
+    </section>
+  <% } %>
+
+  <% if (model.canSubmitValue) { %>
+    <section class="card">
+      <h2>這次值多少</h2>
+      <p>互助完成後，雙方各自填寫認定的金額。結算取較低者。任一方填 0，結算就是 0。</p>
+      <% if (model.myValue != null) { %>
+        <p>你目前填的是 <strong data-my-value="<%= model.myValue %>"><%= formatMerit(model.myValue) %></strong>。結算前可以改。</p>
+      <% } %>
+      <p class="hint"><%= model.otherSubmitted ? '對方已經填了，數字要等結算才看得到。' : '對方還沒填。' %></p>
+      <form method="post" action="/posts/<%= model.id %>/value">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <div class="field">
+          <label for="value">我認為值（功德／新台幣）</label>
+          <input id="value" name="value" inputmode="numeric" min="0" step="1" required value="<%= model.myValue != null ? model.myValue : '' %>">
+        </div>
+        <label class="check">
+          <input type="checkbox" name="confirm_done" value="1" required>
+          <span>這次互助已經完成，而且沒有現金往來。</span>
+        </label>
+        <button type="submit">送出估價</button>
+      </form>
+      <% if (model.canRetrySettle) { %>
+        <form method="post" action="/posts/<%= model.id %>/settle">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="secondary" type="submit">用目前的數字完成結算</button>
+        </form>
+        <p class="hint">如果今天已經跟對方結算過，要等到台北時間的明天再按一次。隔日結算會再增加額度。</p>
+      <% } %>
+    </section>
+  <% } %>
+
+  <% if (model.canRate) { %>
+    <section class="card">
+      <h2>給對方星等</h2>
+      <form method="post" action="/posts/<%= model.id %>/rating">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <fieldset class="field">
+          <legend>1 到 5 顆星</legend>
+          <% for (var star = 1; star <= 5; star++) { %>
+            <label class="choice"><input type="radio" name="stars" value="<%= star %>" required> <%= star %> 星</label>
+          <% } %>
+        </fieldset>
+        <div class="field">
+          <label for="comment">備註</label>
+          <textarea id="comment" name="comment" maxlength="500"></textarea>
+          <p class="hint">備註只會存進資料庫，不會顯示給任何人，包括你自己。</p>
+        </div>
+        <button type="submit">送出星等</button>
+      </form>
+    </section>
+  <% } else if (model.myStars) { %>
+    <p>你給了對方 <%= model.myStars %> 星。星等顯示在個人頁，備註不會顯示。</p>
+  <% } %>
+</main>
+<%- include('partials/footer') %>

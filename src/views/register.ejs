@@ -1,0 +1,16 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap narrow">
+  <h1>建立一般使用者</h1>
+  <p>手機 <strong><%= mobile %></strong> 已驗證。這裡只建立一般使用者。新帳號的功德額度與功德都是 100。創辦人與福利機構不會出現在註冊選項裡。</p>
+  <form method="post" action="/register">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="field">
+      <label for="display_name">怎麼稱呼你</label>
+      <input id="display_name" name="display_name" maxlength="20" autocomplete="nickname" required>
+      <p class="hint">1 到 20 個字。其他人在廣場上看得到。</p>
+    </div>
+    <button type="submit">建立帳號</button>
+  </form>
+</main>
+<%- include('partials/footer') %>

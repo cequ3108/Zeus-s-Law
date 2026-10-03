@@ -1,0 +1,53 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap">
+  <h1><%= dash.user.display_name %></h1>
+  <p class="meta"><%= roleLabel(dash.user.role) %> · <%= dash.user.mobile %></p>
+  <section class="balances" aria-label="餘額">
+    <article class="card balance">
+      <p>功德額度</p>
+      <strong data-quota="<%= dash.user.quota %>"><%= formatMerit(dash.user.quota) %></strong>
+      <p class="hint">只會增加，不會減少。1 點等於 1 元新台幣。</p>
+    </article>
+    <article class="card balance">
+      <p>功德</p>
+      <strong data-merit="<%= dash.user.merit %>"><%= formatMerit(dash.user.merit) %></strong>
+      <p class="hint">現在能流動的餘額。不能超過額度，也不能變成負數。</p>
+    </article>
+  </section>
+  <p class="meta">
+    <% if (dash.ratingCount) { %>
+      星等 <span class="stars"><%= starGlyph(dash.ratingAvg) %></span> <%= dash.ratingAvg %>（<%= dash.ratingCount %> 則）
+    <% } else { %>
+      還沒有人給你星等。
+    <% } %>
+    · <a href="/users/<%= dash.user.id %>">看個人頁</a>
+  </p>
+  <% if (dash.user.role === 'user' && !dash.user.blocked) { %>
+    <p><a href="/org/apply">申請成為福利機構</a></p>
+  <% } %>
+  <% if (!dash.user.blocked) { %>
+    <p><a class="button" href="/posts/new">發布一則</a></p>
+  <% } %>
+
+  <h2>我參與的互助</h2>
+  <% if (!dash.posts.length) { %>
+    <p class="empty">你還沒有發布或接下任何一則。</p>
+  <% } %>
+  <% dash.posts.forEach(function (post) { %>
+    <article class="card">
+      <p class="meta">
+        <span class="tag tag-<%= post.kind %>"><%= kindLabel(post.kind) %></span>
+        <span><%= statusLabel(post.status) %></span>
+        <span>標示 <%= formatMerit(post.amount) %></span>
+        <% if (post.settled_amount != null) { %><span>結算 <%= formatMerit(post.settled_amount) %></span><% } %>
+      </p>
+      <h3><a href="/posts/<%= post.id %>"><%= post.description.slice(0, 42) %></a></h3>
+      <p class="meta">
+        <%= post.author_name %>
+        <% if (post.accepter_name) { %> · <%= post.accepter_name %><% } %>
+      </p>
+    </article>
+  <% }) %>
+</main>
+<%- include('partials/footer') %>

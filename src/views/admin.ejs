@@ -1,0 +1,97 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap">
+  <h1>管理</h1>
+  <p>創辦人可以建立福利機構、審核申請，以及封鎖收取現金的帳號。創辦人本身不是從這個頁面註冊出來的。</p>
+
+  <section class="card">
+    <h2>查帳號</h2>
+    <form method="get" action="/admin">
+      <div class="field">
+        <label for="lookup">手機號碼</label>
+        <input id="lookup" name="mobile" value="<%= queryMobile %>" placeholder="0912345678">
+      </div>
+      <button type="submit">查詢</button>
+    </form>
+    <% if (data.lookup && data.lookup.error) { %>
+      <p class="flash flash-err"><%= data.lookup.error %></p>
+    <% } else if (data.lookup && data.lookup.missing) { %>
+      <p>沒有這個帳號。可以用下面的表單直接建立福利機構。</p>
+    <% } else if (data.lookup) { %>
+      <p>
+        <a href="/users/<%= data.lookup.id %>"><%= data.lookup.displayName %></a>
+        · <%= roleLabel(data.lookup.role) %>
+        · 功德 <%= formatMerit(data.lookup.merit) %>
+        · 額度 <%= formatMerit(data.lookup.quota) %>
+        <% if (data.lookup.blocked) { %> · 已封鎖（<%= data.lookup.blockReason %>）<% } %>
+      </p>
+    <% } %>
+  </section>
+
+  <section class="card">
+    <h2>建立福利機構</h2>
+    <p class="hint">新號碼會直接成為機構。已存在的一般使用者會升為機構，功德與額度設為 1,000,000。已經是機構或創辦人則不會改餘額。</p>
+    <form method="post" action="/admin/orgs">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="org_mobile">手機號碼</label>
+        <input id="org_mobile" name="mobile" required placeholder="0912345678">
+      </div>
+      <div class="field">
+        <label for="org_name">機構名稱</label>
+        <input id="org_name" name="display_name" maxlength="30" required>
+      </div>
+      <button type="submit">建立或升為機構</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>待審核的機構申請</h2>
+    <% if (!data.applications.length) { %><p class="empty">目前沒有待審。</p><% } %>
+    <% data.applications.forEach(function (item) { %>
+      <article class="pending">
+        <p><strong><%= item.org_name %></strong> · <%= item.display_name %> · <%= item.mobile %></p>
+        <form method="post" action="/admin/applications/<%= item.id %>/approve">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button type="submit">通過</button>
+        </form>
+        <form method="post" action="/admin/applications/<%= item.id %>/reject">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="secondary" type="submit">拒絕</button>
+        </form>
+      </article>
+    <% }) %>
+  </section>
+
+  <section class="card">
+    <h2>封鎖收取現金的帳號</h2>
+    <form method="post" action="/admin/block">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="block_mobile">手機號碼</label>
+        <input id="block_mobile" name="mobile" required placeholder="0912345678">
+      </div>
+      <div class="field">
+        <label for="reason">原因</label>
+        <input id="reason" name="reason" value="收取現金" maxlength="200">
+      </div>
+      <button class="danger" type="submit">封鎖</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>已封鎖</h2>
+    <% if (!data.blocked.length) { %><p class="empty">目前沒有被封鎖的帳號。</p><% } %>
+    <% data.blocked.forEach(function (item) { %>
+      <article class="pending">
+        <p><a href="/users/<%= item.id %>"><%= item.display_name %></a> · <%= item.mobile %> · <%= item.block_reason %></p>
+        <form method="post" action="/admin/unblock">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <input type="hidden" name="mobile" value="<%= item.mobile %>">
+          <button class="secondary" type="submit">解除封鎖</button>
+        </form>
+      </article>
+    <% }) %>
+  </section>
+</main>
+<%- include('partials/footer') %>

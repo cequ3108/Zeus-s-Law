@@ -1,0 +1,28 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap narrow">
+  <h1>申請成為福利機構</h1>
+  <% if (user.role === 'org') { %>
+    <p>你已經是福利機構。功德與功德額度是機構的額度，用來發布需要、支付幫忙的人。</p>
+  <% } else if (user.role === 'founder') { %>
+    <p>創辦人不用申請。請到管理頁建立或審核福利機構。</p>
+  <% } else if (user.blocked) { %>
+    <p>被封鎖的帳號不能申請。</p>
+  <% } else if (application && application.status === 'pending') { %>
+    <p>「<%= application.org_name %>」正在等創辦人審核。通過之前，你仍是一般使用者。</p>
+  <% } else { %>
+    <p>通過之後，顯示名稱會改成機構名稱，功德與功德額度會設為 1,000,000。通過之前不會變。</p>
+    <% if (application && application.status === 'rejected') { %>
+      <p class="hint">上一份申請沒有通過。可以再送一次。</p>
+    <% } %>
+    <form method="post" action="/org/apply">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="org_name">機構名稱</label>
+        <input id="org_name" name="org_name" maxlength="30" required>
+      </div>
+      <button type="submit">送出申請</button>
+    </form>
+  <% } %>
+</main>
+<%- include('partials/footer') %>

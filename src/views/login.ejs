@@ -1,0 +1,15 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap narrow">
+  <h1>用手機號碼繼續</h1>
+  <p>輸入台灣手機號碼。我們會用簡訊驗證碼確認是你。這裡不設定密碼，也不收集身分證或護照。</p>
+  <form method="post" action="/login">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="field">
+      <label for="mobile">手機號碼</label>
+      <input id="mobile" name="mobile" type="tel" inputmode="numeric" autocomplete="tel" placeholder="0912345678" required>
+    </div>
+    <button type="submit">取得驗證碼</button>
+  </form>
+</main>
+<%- include('partials/footer') %>

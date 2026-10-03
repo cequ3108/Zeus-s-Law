@@ -1,0 +1,37 @@
+<header class="masthead">
+  <div class="wrap masthead-inner">
+    <div>
+      <a class="brand" href="/">宙斯法則</a>
+      <p class="tagline">互助不收現金。功德在人之間流動。</p>
+    </div>
+    <p class="seal">禁現金</p>
+  </div>
+  <nav class="wrap">
+    <a href="/">廣場</a>
+    <a href="/rules">規範</a>
+    <% if (user) { %>
+      <% if (!user.blocked) { %><a href="/posts/new">發布</a><% } %>
+      <a href="/me">我的</a>
+      <a href="/users/<%= user.id %>">個人頁</a>
+      <% if (user.role === 'founder') { %><a href="/admin">管理</a><% } %>
+      <form class="nav-form" method="post" action="/logout">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button type="submit">登出</button>
+      </form>
+    <% } else { %>
+      <a href="/login">登入</a>
+    <% } %>
+  </nav>
+</header>
+<div class="cash-banner">本平台禁止現金。不准用錢買這份幫助，也不准把功德換成現金。</div>
+<% if (devSms) { %>
+  <div class="dev-banner">開發模式：還沒有設定簡訊服務。驗證碼會直接顯示在畫面上，正式環境請改接 EVERY8D。</div>
+<% } %>
+<% if (user && user.blocked) { %>
+  <div class="blocked-banner">你的帳號已被封鎖<% if (user.block_reason) { %>（<%= user.block_reason %>）<% } %>，不能發布或接下。</div>
+<% } %>
+<% if (flash) { %>
+  <div class="wrap">
+    <p class="flash flash-<%= flash.type %>"><%= flash.message %></p>
+  </div>
+<% } %>

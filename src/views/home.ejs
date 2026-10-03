@@ -1,0 +1,41 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap">
+  <section class="hero">
+    <h1>今天可以接的互助</h1>
+    <p>食物、交通，或其他需要。你可以寫「我可以提供」，也可以寫「我需要」。標一個功德金額，最後以雙方認定的較低者結算。</p>
+    <% if (!user) { %>
+      <p><a class="button" href="/login">用手機號碼加入</a></p>
+    <% } else if (!user.blocked) { %>
+      <p><a class="button" href="/posts/new">發布一則</a></p>
+    <% } %>
+  </section>
+
+  <% if (!posts.length) { %>
+    <p class="empty">廣場還沒有招募中的貼文。</p>
+  <% } %>
+
+  <div class="post-list">
+    <% posts.forEach(function (post) { %>
+      <article class="card">
+        <p class="meta">
+          <span class="tag tag-<%= post.kind %>"><%= kindLabel(post.kind) %></span>
+          <span class="tag"><%= categoryLabel(post.category) %></span>
+          <span>標示 <%= formatMerit(post.amount) %> 功德</span>
+        </p>
+        <h2><a href="/posts/<%= post.id %>"><%= kindLabel(post.kind) %> · <%= categoryLabel(post.category) %></a></h2>
+        <p class="excerpt"><%= post.description %></p>
+        <p class="meta">
+          <a href="/users/<%= post.author_id %>"><%= post.author_name %></a>
+          · <%= roleLabel(post.author_role) %>
+          <% if (post.author_count) { %>
+            · <span class="stars"><%= starGlyph(post.author_avg) %></span> <%= post.author_avg %>
+          <% } else { %>
+            · 尚無星等
+          <% } %>
+        </p>
+      </article>
+    <% }) %>
+  </div>
+</main>
+<%- include('partials/footer') %>
