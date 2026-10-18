@@ -6,6 +6,7 @@ const sms = require('./sms');
 const { cleanPassword, hashPassword, verifyPassword } = require('./password');
 const { normalizeCity, cleanDistrict } = require('./places');
 const { TEMPLATES } = require('./templates');
+const { meetingShareText, lineShareUrl } = require('./share');
 
 const BANNED_PHRASES = ['現金', '轉帳給我', '匯款', '付錢'];
 
@@ -53,6 +54,13 @@ function createServices(db, options = {}) {
   function assertNoCashLanguage(text) {
     const hit = BANNED_PHRASES.find((phrase) => text.includes(phrase));
     if (hit) throw new AppError(`請不要寫「${hit}」。功德不可購買、兌現或轉售。`);
+  }
+
+  function cleanOptional(raw, label, max) {
+    const text = String(raw || '').replace(/[\u0000-\u001F]/g, '').trim();
+    if (!text) return null;
+    if ([...text].length > max) throw new AppError(`${label}請不要超過 ${max} 個字。`);
+    return text;
   }
 
   function cleanTitle(raw) {
@@ -268,19 +276,22 @@ function createServices(db, options = {}) {
     if (!CATEGORIES[input.category]) throw new AppError('請選擇食物、交通或其他。');
     const description = cleanText(input.description, '描述');
     const amount = parseAmount(input.amount, '金額', 1);
-    assertNoCashLanguage(`${input.title || ''}\n${description}`);
+    assertNoCashLanguage([input.title, description, input.meeting_place, input.meeting_time].join('\n'));
     const city = normalizeCity(input.city);
     const district = cleanDistrict(input.district);
     const title = cleanTitle(input.title);
     const hours = expiryHours(input.expires_hours);
+    const meetingPlace = cleanOptional(input.meeting_place, '地點', 80);
+    const meetingTime = cleanOptional(input.meeting_time, '時間', 80);
     const info = db.prepare(`
       INSERT INTO posts (
-        author_id, kind, category, description, amount, status, created_at, city, district, title, expires_at
+        author_id, kind, category, description, amount, status, created_at,
+        city, district, title, expires_at, meeting_place, meeting_time
       )
-      VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?)
     `).run(
       author.id, kind, input.category, description, amount, clock().toISOString(),
-      city, district, title, expiresAt(hours),
+      city, district, title, expiresAt(hours), meetingPlace, meetingTime,
     );
     return { id: Number(info.lastInsertRowid) };
   }
@@ -340,12 +351,14 @@ function createServices(db, options = {}) {
       }
       const info = db.prepare(`
         INSERT INTO posts (
-          author_id, kind, category, description, amount, status, created_at, city, district, title, expires_at
+          author_id, kind, category, description, amount, status, created_at,
+          city, district, title, expires_at, meeting_place, meeting_time
         )
-        VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?)
       `).run(
         post.author_id, post.kind, post.category, post.description, post.amount,
         clock().toISOString(), post.city, post.district, post.title, expiresAt(hours),
+        post.meeting_place, post.meeting_time,
       );
       return { id: Number(info.lastInsertRowid) };
     }).immediate();
@@ -639,6 +652,21 @@ function createServices(db, options = {}) {
     return { user, ratings, ...ratingSummary(userId) };
   }
 
+  function lineShareFor(viewer, row) {
+    const otherId = viewer.id === row.host_id ? row.seeker_id : row.host_id;
+    const other = db.prepare('SELECT id, display_name FROM users WHERE id = ?').get(otherId);
+    if (!other) return null;
+    const summary = ratingSummary(other.id);
+    const text = meetingShareText({
+      nickname: other.display_name,
+      ratingAvg: summary.ratingAvg,
+      ratingCount: summary.ratingCount,
+      place: row.meeting_place,
+      time: row.meeting_time,
+    });
+    return { text, url: lineShareUrl(text) };
+  }
+
   function postPage(postId, viewerId) {
     const row = db.prepare(`
       SELECT p.*,
@@ -745,6 +773,11 @@ function createServices(db, options = {}) {
       canRepost: !!(viewer && viewer.id === row.author_id && row.status === 'open' && expired),
       canSubmitValue: !!(isParty && row.status === 'matched'),
       canRetrySettle: !!(isParty && row.status === 'matched' && row.host_value != null && row.seeker_value != null),
+      meetingPlace: row.meeting_place,
+      meetingTime: row.meeting_time,
+      lineShare: isParty && (row.status === 'matched' || settled) && row.host_id && row.seeker_id
+        ? lineShareFor(viewer, row)
+        : null,
       canRate: !!(isParty && settled && !myRating),
       myStars: myRating ? myRating.stars : null,
       loggedIn: !!viewer,

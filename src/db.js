@@ -61,7 +61,9 @@ CREATE TABLE IF NOT EXISTS posts (
   settled_at TEXT,
   city TEXT,
   district TEXT,
-  expires_at TEXT
+  expires_at TEXT,
+  meeting_place TEXT,
+  meeting_time TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_posts_status ON posts (status, id);
@@ -116,6 +118,8 @@ function migrate(db) {
   addColumn(db, 'posts', 'district', 'TEXT');
   addColumn(db, 'posts', 'title', 'TEXT');
   addColumn(db, 'posts', 'expires_at', 'TEXT');
+  addColumn(db, 'posts', 'meeting_place', 'TEXT');
+  addColumn(db, 'posts', 'meeting_time', 'TEXT');
 }
 
 function openDatabase(dbPath) {

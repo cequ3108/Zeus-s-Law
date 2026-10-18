@@ -64,6 +64,20 @@
       <% if (model.seeker.merit != null) { %>
         <p class="hint">接受幫助的人目前功德是 <%= formatMerit(model.seeker.merit) %>。結算不能高過這個數字，否則餘額會變成負數。</p>
       <% } %>
+      <% if (model.meetingTime || model.meetingPlace) { %>
+        <p>
+          <% if (model.meetingTime) { %>時間：<%= model.meetingTime %><% } %>
+          <% if (model.meetingPlace) { %>　地點：<%= model.meetingPlace %><% } %>
+        </p>
+      <% } %>
+    </section>
+  <% } %>
+
+  <% if (model.lineShare) { %>
+    <section class="card">
+      <h2>約在人多的地方</h2>
+      <p>約在便利商店、捷運站，或其他人多的公共場所。不要約在住處。把對方的稱呼、星等、時間和地點傳給一位朋友。</p>
+      <p><a class="button" href="<%= model.lineShare.url %>" rel="noopener">用 LINE 傳給朋友</a></p>
     </section>
   <% } %>
 
