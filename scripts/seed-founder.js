@@ -1,5 +1,4 @@
-const path = require('path');
-const { openDatabase } = require('../src/db');
+const { openDatabase, resolveDbPath } = require('../src/db');
 const { createServices } = require('../src/services');
 const { AppError } = require('../src/errors');
 
@@ -11,7 +10,7 @@ if (!mobile) {
   process.exit(1);
 }
 
-const db = openDatabase(process.env.DB_PATH || path.join(__dirname, '..', 'data', 'zeus.db'));
+const db = openDatabase(resolveDbPath());
 const services = createServices(db);
 
 try {

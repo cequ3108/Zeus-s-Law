@@ -3,6 +3,7 @@ const { AppError } = require('./errors');
 const { CATEGORIES, ENDOWMENTS, MAX_AMOUNT } = require('./constants');
 const { taipeiDate } = require('./time');
 const sms = require('./sms');
+const { cleanPassword, hashPassword, verifyPassword } = require('./password');
 
 function createServices(db, options = {}) {
   const now = options.now || (() => new Date());
@@ -67,12 +68,12 @@ function createServices(db, options = {}) {
     return db.prepare('SELECT * FROM users WHERE mobile = ?').get(mobile) || null;
   }
 
-  function insertUser({ mobile, displayName, role }) {
+  function insertUser({ mobile, displayName, role, passwordHash = null }) {
     const endowment = ENDOWMENTS[role];
     const info = db.prepare(`
-      INSERT INTO users (mobile, display_name, role, merit, quota, blocked, created_at)
-      VALUES (?, ?, ?, ?, ?, 0, ?)
-    `).run(mobile, displayName, role, endowment.merit, endowment.quota, clock().toISOString());
+      INSERT INTO users (mobile, display_name, role, merit, quota, blocked, created_at, password_hash)
+      VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+    `).run(mobile, displayName, role, endowment.merit, endowment.quota, clock().toISOString(), passwordHash);
     return mustUser(Number(info.lastInsertRowid));
   }
 
@@ -146,6 +147,67 @@ function createServices(db, options = {}) {
     const mobile = normalizeMobile(rawMobile);
     if (findByMobile(mobile)) throw new AppError('這個手機號碼已經註冊，請直接登入。');
     return insertUser({ mobile, displayName: cleanName(displayName), role: 'user' });
+  }
+
+  function registerWithPassword(rawMobile, displayName, rawPassword, rawConfirm) {
+    const mobile = normalizeMobile(rawMobile);
+    if (findByMobile(mobile)) throw new AppError('這個手機號碼已經註冊，請直接登入。');
+    const password = cleanPassword(rawPassword);
+    if (password !== String(rawConfirm ?? '')) throw new AppError('兩次輸入的密碼不一樣。');
+    return insertUser({
+      mobile,
+      displayName: cleanName(displayName),
+      role: 'user',
+      passwordHash: hashPassword(password),
+    });
+  }
+
+  function loginWithPassword(rawMobile, rawPassword) {
+    let mobile;
+    try {
+      mobile = normalizeMobile(rawMobile);
+    } catch {
+      throw new AppError('手機號碼或密碼不正確。');
+    }
+    const user = findByMobile(mobile);
+    const ok = !!(user && user.password_hash && verifyPassword(String(rawPassword ?? ''), user.password_hash));
+    if (!ok) throw new AppError('手機號碼或密碼不正確。');
+    return user;
+  }
+
+  function ensureFounderAccount(rawMobile, rawPassword) {
+    const mobile = normalizeMobile(rawMobile);
+    const passwordHash = hashPassword(cleanPassword(rawPassword));
+    const existing = findByMobile(mobile);
+    if (!existing) {
+      const user = insertUser({ mobile, displayName: '創辦人', role: 'founder', passwordHash });
+      return { created: true, user };
+    }
+    if (existing.role !== 'founder') {
+      throw new AppError('這個手機號碼已經是其他角色，沒有改成創辦人，餘額也沒有變動。');
+    }
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, existing.id);
+    return { created: false, user: mustUser(existing.id) };
+  }
+
+  function ensureFounderFromEnv(env = process.env) {
+    const phone = String(env.FOUNDER_PHONE || '').trim();
+    const password = env.FOUNDER_PASSWORD;
+    const missingPassword = password == null || password === '';
+    if (!phone && missingPassword) return { status: 'skipped' };
+    if (!phone || missingPassword) return { status: 'incomplete' };
+    try {
+      const result = ensureFounderAccount(phone, password);
+      return {
+        status: result.created ? 'created' : 'updated',
+        mobile: result.user.mobile,
+      };
+    } catch (err) {
+      if (err instanceof AppError && err.message.includes('其他角色')) {
+        return { status: 'conflict', message: err.message };
+      }
+      throw err;
+    }
   }
 
   function seedFounder(rawMobile, displayName) {
@@ -601,6 +663,10 @@ function createServices(db, options = {}) {
     requestOtp,
     verifyOtp,
     register,
+    registerWithPassword,
+    loginWithPassword,
+    ensureFounderAccount,
+    ensureFounderFromEnv,
     seedFounder,
     createPost,
     acceptPost,

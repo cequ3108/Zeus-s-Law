@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   quota INTEGER NOT NULL,
   blocked INTEGER NOT NULL DEFAULT 0 CHECK (blocked IN (0, 1)),
   block_reason TEXT,
+  password_hash TEXT,
   created_at TEXT NOT NULL,
   CHECK (merit >= 0),
   CHECK (quota >= 0),
@@ -85,6 +86,26 @@ CREATE TABLE IF NOT EXISTS ratings (
 CREATE INDEX IF NOT EXISTS idx_ratings_ratee ON ratings (ratee_id);
 `;
 
+function resolveDbPath(env = process.env) {
+  if (env.DB_PATH) return env.DB_PATH;
+  const dir = env.DATA_DIR || path.join(__dirname, '..', 'data');
+  return path.join(dir, 'zeus.db');
+}
+
+function columnNames(db, table) {
+  return new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((column) => column.name));
+}
+
+function addColumn(db, table, column, definition) {
+  if (!columnNames(db, table).has(column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+function migrate(db) {
+  addColumn(db, 'users', 'password_hash', 'TEXT');
+}
+
 function openDatabase(dbPath) {
   if (dbPath !== ':memory:') {
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -93,7 +114,8 @@ function openDatabase(dbPath) {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.exec(SCHEMA);
+  migrate(db);
   return db;
 }
 
-module.exports = { openDatabase };
+module.exports = { openDatabase, resolveDbPath, migrate };

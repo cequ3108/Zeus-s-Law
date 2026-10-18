@@ -167,6 +167,42 @@ function createApp(options = {}) {
     res.render('login', { title: '登入' });
   });
 
+  app.post('/login/password', requireCsrf, (req, res) => {
+    try {
+      const user = services.loginWithPassword(req.body.mobile, req.body.password);
+      req.session.userId = user.id;
+      const dest = safeReturn(req.session.returnTo) || '/me';
+      delete req.session.returnTo;
+      redirectWith(req, res, dest, { type: 'ok', message: '已登入。' });
+    } catch (err) {
+      handle(err, req, res, '/login');
+    }
+  });
+
+  app.post('/join', requireCsrf, (req, res) => {
+    if (!isDevMode()) {
+      redirectWith(req, res, '/login', { type: 'err', message: '已接上簡訊時，請用驗證碼建立帳號。' });
+      return;
+    }
+    try {
+      const user = services.registerWithPassword(
+        req.body.mobile,
+        req.body.display_name,
+        req.body.password,
+        req.body.password_confirm,
+      );
+      req.session.userId = user.id;
+      const dest = safeReturn(req.session.returnTo) || '/me';
+      delete req.session.returnTo;
+      redirectWith(req, res, dest, {
+        type: 'ok',
+        message: '帳號已建立。功德額度 100，功德 100。之後用手機號碼與密碼登入。',
+      });
+    } catch (err) {
+      handle(err, req, res, '/login');
+    }
+  });
+
   app.post('/login', requireCsrf, asyncRoute(async (req, res) => {
     try {
       const result = await services.requestOtp(req.body.mobile);
