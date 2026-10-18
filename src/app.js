@@ -157,6 +157,7 @@ function createApp(options = {}) {
       `).get(req.session.userId) || null;
       if (!res.locals.user) delete req.session.userId;
     }
+    res.locals.actionCount = res.locals.user ? services.pendingActions(res.locals.user.id) : 0;
     next();
   });
 
@@ -646,6 +647,10 @@ function createApp(options = {}) {
     }
     try {
       const result = services.submitValue(id, res.locals.user.id, req.body.value);
+      if (result.status === 'settled') {
+        redirectWith(req, res, `${back}#rate`, { type: 'ok', message: '結算完成，給對方星等吧。' });
+        return;
+      }
       redirectWith(req, res, back, settlementFlash(result));
     } catch (err) {
       handle(err, req, res, back);

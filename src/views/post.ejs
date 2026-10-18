@@ -94,6 +94,7 @@
   <% if (model.canSubmitValue) { %>
     <section class="card">
       <h2>這次值多少</h2>
+      <p id="settle-steps">雙方各自填上估價，填齊就會結算，然後才能評分。</p>
       <p>互助完成後，雙方各自填寫認定的金額。結算取較低者。任一方填 0，結算就是 0。</p>
       <% if (model.myValue != null) { %>
         <p>你目前填的是 <strong data-my-value="<%= model.myValue %>"><%= formatMerit(model.myValue) %></strong>。結算前可以改。</p>
@@ -122,7 +123,7 @@
   <% } %>
 
   <% if (model.canRate) { %>
-    <section class="card">
+    <section class="card" id="rate">
       <h2>給對方星等</h2>
       <form method="post" action="/posts/<%= model.id %>/rating">
         <input type="hidden" name="_csrf" value="<%= csrf %>">

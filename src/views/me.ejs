@@ -1,7 +1,7 @@
 <%- include('partials/head') %>
 <%- include('partials/header') %>
 <main class="wrap">
-  <h1>我的交易</h1>
+  <h1>我的交易<% if (dash.actionCount) { %> (<%= dash.actionCount %>)<% } %></h1>
   <p class="meta"><%= dash.user.display_name %></p>
   <p class="meta"><%= roleLabel(dash.user.role) %> · <%= dash.user.mobile %></p>
   <section class="balances" aria-label="餘額">
@@ -39,11 +39,12 @@
     <article class="card">
       <p class="meta">
         <span class="tag tag-<%= post.kind %>"><%= kindLabel(post.kind) %></span>
+        <% if (post.task) { %><span class="tag tag-task" data-task="<%= post.task %>"><%= post.task %></span><% } %>
         <span><%= post.expired ? '已過期' : statusLabel(post.status) %></span>
         <span>標示 <%= formatMerit(post.amount) %></span>
         <% if (post.settled_amount != null) { %><span>結算 <%= formatMerit(post.settled_amount) %></span><% } %>
       </p>
-      <h3><a href="/posts/<%= post.id %>"><%= post.title || post.description.slice(0, 42) %></a></h3>
+      <h3><a href="/posts/<%= post.id %><%= post.task === '待評分' ? '#rate' : '' %>"><%= post.title || post.description.slice(0, 42) %></a></h3>
       <p class="meta">
         <%= post.author_name %>
         <% if (post.accepter_name) { %> · <%= post.accepter_name %><% } %>

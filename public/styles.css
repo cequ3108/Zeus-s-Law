@@ -114,6 +114,7 @@ main { padding-top: 8px; }
 }
 .tag-need { background: #f3d6d0; color: #6d1a16; }
 .tag-offer { background: #d7eadc; color: var(--good); }
+.tag-task { background: #f4e3a8; color: #3d3208; font-weight: 750; }
 
 .flash { padding: 12px 14px; border-radius: 12px; }
 .flash-ok { background: #e5f4ea; color: var(--good); }

@@ -728,23 +728,66 @@ function createServices(db, options = {}) {
     `).all(...params);
   }
 
+  function taskFor(post, userId) {
+    const party = userId === post.host_id || userId === post.seeker_id;
+    if (!party) return '';
+    if (post.status === 'matched') {
+      const mine = userId === post.host_id ? post.host_value : post.seeker_value;
+      const other = userId === post.host_id ? post.seeker_value : post.host_value;
+      if (mine == null) return '待填估價';
+      if (other == null) return '等對方填';
+      return '';
+    }
+    if (post.status === 'settled' && !post.i_rated) return '待評分';
+    return '';
+  }
+
+  function pendingActions(userId) {
+    return db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM posts p
+      WHERE (p.host_id = ? OR p.seeker_id = ?)
+        AND (
+          (
+            p.status = 'matched' AND (
+              (p.host_id = ? AND p.host_value IS NULL)
+              OR (p.seeker_id = ? AND p.seeker_value IS NULL)
+            )
+          )
+          OR (
+            p.status = 'settled'
+            AND NOT EXISTS (
+              SELECT 1 FROM ratings r WHERE r.post_id = p.id AND r.rater_id = ?
+            )
+          )
+        )
+    `).get(userId, userId, userId, userId, userId).count;
+  }
+
   function dashboard(userId) {
     const user = mustUser(userId);
     const nowIso = clock().toISOString();
     const posts = db.prepare(`
       SELECT p.id, p.kind, p.category, p.title, p.description, p.amount, p.status,
              p.settled_amount, p.created_at, p.expires_at, p.author_id,
-             a.display_name AS author_name, b.display_name AS accepter_name
+             p.host_id, p.seeker_id, p.host_value, p.seeker_value,
+             a.display_name AS author_name, b.display_name AS accepter_name,
+             EXISTS(SELECT 1 FROM ratings r WHERE r.post_id = p.id AND r.rater_id = ?) AS i_rated
       FROM posts p
       JOIN users a ON a.id = p.author_id
       LEFT JOIN users b ON b.id = p.accepter_id
       WHERE p.author_id = ? OR p.accepter_id = ?
       ORDER BY p.id DESC
-    `).all(userId, userId).map((post) => ({
+    `).all(userId, userId, userId).map((post) => ({
       ...post,
       expired: post.status === 'open' && post.expires_at && post.expires_at <= nowIso,
-    }));
-    return { user, posts, ...ratingSummary(userId), application: latestApplication(userId) };
+      task: taskFor(post, userId),
+    })).sort((a, b) => {
+      const rank = (post) => (post.task === '待填估價' || post.task === '待評分' ? 0 : 1);
+      return rank(a) - rank(b) || b.id - a.id;
+    });
+    const actionCount = posts.filter((post) => post.task === '待填估價' || post.task === '待評分').length;
+    return { user, posts, actionCount, ...ratingSummary(userId), application: latestApplication(userId) };
   }
 
   function getProfile(userId) {
@@ -976,6 +1019,7 @@ function createServices(db, options = {}) {
     priceHint,
     weeklySummary,
     dashboard,
+    pendingActions,
     getProfile,
     postPage,
     adminSnapshot,
