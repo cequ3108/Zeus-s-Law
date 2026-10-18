@@ -19,6 +19,19 @@
       </article>
     </section>
   <% } %>
+  <section class="card" data-helped="<%= profile.reputation.helped %>" data-helped-by="<%= profile.reputation.helpedBy %>" data-rating-count="<%= profile.ratingCount %>" data-rating-avg="<%= profile.ratingAvg == null ? '' : profile.ratingAvg %>">
+    <h2>信譽</h2>
+    <p>幫過別人 <%= profile.reputation.helped %> 次 · 被幫過 <%= profile.reputation.helpedBy %> 次</p>
+    <% if (profile.reputation.badges.length) { %>
+      <p>
+        <% profile.reputation.badges.forEach(function (badge) { %>
+          <span class="tag"><%= badge %></span>
+        <% }) %>
+      </p>
+    <% } else { %>
+      <p class="hint">完成互助之後，這裡會出現徽章。徽章不另發功德。</p>
+    <% } %>
+  </section>
   <section class="card" data-rating-count="<%= profile.ratingCount %>" data-rating-avg="<%= profile.ratingAvg == null ? '' : profile.ratingAvg %>">
     <h2>星等</h2>
     <% if (profile.ratingCount) { %>

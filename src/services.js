@@ -144,6 +144,20 @@ function createServices(db, options = {}) {
     };
   }
 
+  function reputation(userId) {
+    const helped = db.prepare(`
+      SELECT COUNT(*) AS count FROM posts WHERE host_id = ? AND status = 'settled'
+    `).get(userId).count;
+    const helpedBy = db.prepare(`
+      SELECT COUNT(*) AS count FROM posts WHERE seeker_id = ? AND status = 'settled'
+    `).get(userId).count;
+    const badges = [];
+    if (helped >= 1) badges.push('伸出援手');
+    if (helped >= 5) badges.push('常幫忙');
+    if (helped >= 1 && helpedBy >= 1) badges.push('互相往來');
+    return { helped, helpedBy, badges, ...ratingSummary(userId) };
+  }
+
   async function requestOtp(rawMobile) {
     const mobile = normalizeMobile(rawMobile);
     const since = clock().getTime() - 10 * 60 * 1000;
@@ -608,7 +622,8 @@ function createServices(db, options = {}) {
       SELECT p.id, p.kind, p.category, p.title, p.description, p.amount, p.created_at, p.city, p.district,
              u.id AS author_id, u.display_name AS author_name, u.role AS author_role,
              (SELECT ROUND(AVG(stars), 1) FROM ratings WHERE ratee_id = u.id) AS author_avg,
-             (SELECT COUNT(*) FROM ratings WHERE ratee_id = u.id) AS author_count
+             (SELECT COUNT(*) FROM ratings WHERE ratee_id = u.id) AS author_count,
+             (SELECT COUNT(*) FROM posts WHERE host_id = u.id AND status = 'settled') AS author_helped
       FROM posts p
       JOIN users u ON u.id = p.author_id
       WHERE ${where.join(' AND ')}
@@ -649,18 +664,19 @@ function createServices(db, options = {}) {
       WHERE r.ratee_id = ?
       ORDER BY r.id DESC
     `).all(userId);
-    return { user, ratings, ...ratingSummary(userId) };
+    return { user, ratings, reputation: reputation(userId), ...ratingSummary(userId) };
   }
 
   function lineShareFor(viewer, row) {
     const otherId = viewer.id === row.host_id ? row.seeker_id : row.host_id;
     const other = db.prepare('SELECT id, display_name FROM users WHERE id = ?').get(otherId);
     if (!other) return null;
-    const summary = ratingSummary(other.id);
+    const summary = reputation(other.id);
     const text = meetingShareText({
       nickname: other.display_name,
       ratingAvg: summary.ratingAvg,
       ratingCount: summary.ratingCount,
+      helped: summary.helped,
       place: row.meeting_place,
       time: row.meeting_time,
     });
@@ -681,7 +697,7 @@ function createServices(db, options = {}) {
     if (!row) return null;
 
     const viewer = viewerId ? db.prepare('SELECT * FROM users WHERE id = ?').get(viewerId) : null;
-    const summary = ratingSummary(row.author_id);
+    const summary = reputation(row.author_id);
     const settled = row.status === 'settled';
     const isParty = !!(viewer && (viewer.id === row.host_id || viewer.id === row.seeker_id));
     const seeker = row.seeker_id
@@ -737,6 +753,8 @@ function createServices(db, options = {}) {
         blocked: row.author_blocked === 1,
         ratingAvg: summary.ratingAvg,
         ratingCount: summary.ratingCount,
+        helped: summary.helped,
+        badges: summary.badges,
       },
       accepter: row.accepter_id
         ? { id: row.accepter_id, name: row.accepter_name, role: row.accepter_role }
