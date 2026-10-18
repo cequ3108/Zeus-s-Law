@@ -11,6 +11,7 @@
     "dev": "node --watch src/server.js",
     "test": "node --test",
     "seed:founder": "node scripts/seed-founder.js",
+    "seed:demo": "node scripts/seed-demo.js",
     "backup": "node scripts/backup.js"
   },
   "dependencies": {
