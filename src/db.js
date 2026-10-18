@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT,
   city TEXT,
   district TEXT,
+  availability TEXT,
   created_at TEXT NOT NULL,
   CHECK (merit >= 0),
   CHECK (quota >= 0),
@@ -114,6 +115,7 @@ function migrate(db) {
   addColumn(db, 'users', 'password_hash', 'TEXT');
   addColumn(db, 'users', 'city', 'TEXT');
   addColumn(db, 'users', 'district', 'TEXT');
+  addColumn(db, 'users', 'availability', 'TEXT');
   addColumn(db, 'posts', 'city', 'TEXT');
   addColumn(db, 'posts', 'district', 'TEXT');
   addColumn(db, 'posts', 'title', 'TEXT');

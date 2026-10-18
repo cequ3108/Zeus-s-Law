@@ -20,7 +20,12 @@
       <label for="district">行政區（可以不填）</label>
       <input id="district" name="district" maxlength="20" value="<%= user.district || '' %>">
     </div>
-    <button type="submit">儲存縣市</button>
+    <div class="field">
+      <label for="availability">今日空檔</label>
+      <input id="availability" name="availability" maxlength="80" value="<%= user.availability || '' %>" placeholder="例如 今天 14:00–18:00 可以">
+      <p class="hint">會出現在你的公開個人頁和廣場上的貼文旁邊。沒有填就留空。</p>
+    </div>
+    <button type="submit">儲存</button>
   </form>
   <p><a class="button" href="/users/<%= user.id %>">看公開個人頁</a></p>
   <p><a href="/me">回到我的交易</a></p>

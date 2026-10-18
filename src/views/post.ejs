@@ -22,6 +22,7 @@
       · 尚無星等
     <% } %>
     · 幫過 <%= model.author.helped %> 次
+    <% if (model.author.availability) { %> · 今日空檔 <%= model.author.availability %><% } %>
     <% if (model.author.blocked) { %> · 已封鎖<% } %>
   </p>
 

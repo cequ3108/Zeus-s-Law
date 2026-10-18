@@ -56,6 +56,7 @@
             · 尚無星等
           <% } %>
           · 幫過 <%= post.author_helped %> 次
+          <% if (post.author_availability) { %> · 今日空檔 <%= post.author_availability %><% } %>
         </p>
       </article>
     <% }) %>

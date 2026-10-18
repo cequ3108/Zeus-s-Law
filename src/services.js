@@ -318,6 +318,12 @@ function createServices(db, options = {}) {
     return mustUser(userId);
   }
 
+  function updateAvailability(userId, raw) {
+    const text = cleanOptional(raw, '今日空檔', 80);
+    db.prepare('UPDATE users SET availability = ? WHERE id = ?').run(text, userId);
+    return mustUser(userId);
+  }
+
   function acceptPost(postId, userId) {
     return db.transaction(() => {
       const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
@@ -621,6 +627,7 @@ function createServices(db, options = {}) {
     return db.prepare(`
       SELECT p.id, p.kind, p.category, p.title, p.description, p.amount, p.created_at, p.city, p.district,
              u.id AS author_id, u.display_name AS author_name, u.role AS author_role,
+             u.availability AS author_availability,
              (SELECT ROUND(AVG(stars), 1) FROM ratings WHERE ratee_id = u.id) AS author_avg,
              (SELECT COUNT(*) FROM ratings WHERE ratee_id = u.id) AS author_count,
              (SELECT COUNT(*) FROM posts WHERE host_id = u.id AND status = 'settled') AS author_helped
@@ -653,7 +660,7 @@ function createServices(db, options = {}) {
 
   function getProfile(userId) {
     const user = db.prepare(`
-      SELECT id, display_name, role, blocked, created_at
+      SELECT id, display_name, role, blocked, created_at, city, district, availability
       FROM users WHERE id = ?
     `).get(userId);
     if (!user) return null;
@@ -687,7 +694,7 @@ function createServices(db, options = {}) {
     const row = db.prepare(`
       SELECT p.*,
         a.display_name AS author_name, a.role AS author_role,
-        a.blocked AS author_blocked, a.merit AS author_merit,
+        a.blocked AS author_blocked, a.merit AS author_merit, a.availability AS author_availability,
         b.display_name AS accepter_name, b.role AS accepter_role
       FROM posts p
       JOIN users a ON a.id = p.author_id
@@ -751,6 +758,7 @@ function createServices(db, options = {}) {
         name: row.author_name,
         role: row.author_role,
         blocked: row.author_blocked === 1,
+        availability: row.author_availability,
         ratingAvg: summary.ratingAvg,
         ratingCount: summary.ratingCount,
         helped: summary.helped,
@@ -850,6 +858,7 @@ function createServices(db, options = {}) {
     seedFounder,
     createPost,
     updateAccountPlace,
+    updateAvailability,
     acceptPost,
     repostPost,
     cancelPost,

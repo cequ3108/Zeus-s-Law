@@ -90,7 +90,7 @@ function createApp(options = {}) {
     res.locals.user = null;
     if (req.session.userId) {
       res.locals.user = options.db.prepare(`
-        SELECT id, mobile, display_name, role, merit, quota, blocked, block_reason, city, district
+        SELECT id, mobile, display_name, role, merit, quota, blocked, block_reason, city, district, availability
         FROM users WHERE id = ?
       `).get(req.session.userId) || null;
       if (!res.locals.user) delete req.session.userId;
@@ -320,7 +320,8 @@ function createApp(options = {}) {
   app.post('/account', requireCsrf, requireLogin, (req, res) => {
     try {
       services.updateAccountPlace(res.locals.user.id, req.body);
-      redirectWith(req, res, '/account', { type: 'ok', message: '已記下你的縣市。首頁會先顯示這裡的招募。' });
+      services.updateAvailability(res.locals.user.id, req.body.availability);
+      redirectWith(req, res, '/account', { type: 'ok', message: '已記下你的縣市與今日空檔。' });
     } catch (err) {
       handle(err, req, res, '/account');
     }
