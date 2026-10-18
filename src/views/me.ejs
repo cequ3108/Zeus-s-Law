@@ -43,7 +43,7 @@
         <span>標示 <%= formatMerit(post.amount) %></span>
         <% if (post.settled_amount != null) { %><span>結算 <%= formatMerit(post.settled_amount) %></span><% } %>
       </p>
-      <h3><a href="/posts/<%= post.id %>"><%= post.description.slice(0, 42) %></a></h3>
+      <h3><a href="/posts/<%= post.id %>"><%= post.title || post.description.slice(0, 42) %></a></h3>
       <p class="meta">
         <%= post.author_name %>
         <% if (post.accepter_name) { %> · <%= post.accepter_name %><% } %>

@@ -30,6 +30,13 @@ function createServices(db, options = {}) {
     return name;
   }
 
+  function cleanTitle(raw) {
+    const text = String(raw || '').replace(/[\u0000-\u001F]/g, '').trim();
+    if (!text) return null;
+    if ([...text].length > 40) throw new AppError('標題請不要超過 40 個字。');
+    return text;
+  }
+
   function cleanText(raw, label, { min = 1, max = 1000 } = {}) {
     const text = String(raw || '').replace(/\r\n/g, '\n').trim();
     if ([...text].length < min) throw new AppError(`${label}必須填寫。`);
@@ -238,12 +245,13 @@ function createServices(db, options = {}) {
     const amount = parseAmount(input.amount, '金額', 1);
     const city = normalizeCity(input.city);
     const district = cleanDistrict(input.district);
+    const title = cleanTitle(input.title);
     const info = db.prepare(`
       INSERT INTO posts (
-        author_id, kind, category, description, amount, status, created_at, city, district
+        author_id, kind, category, description, amount, status, created_at, city, district, title
       )
-      VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?)
-    `).run(author.id, kind, input.category, description, amount, clock().toISOString(), city, district);
+      VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?)
+    `).run(author.id, kind, input.category, description, amount, clock().toISOString(), city, district, title);
     return { id: Number(info.lastInsertRowid) };
   }
 
@@ -497,7 +505,7 @@ function createServices(db, options = {}) {
       params.push(filter.category);
     }
     return db.prepare(`
-      SELECT p.id, p.kind, p.category, p.description, p.amount, p.created_at, p.city, p.district,
+      SELECT p.id, p.kind, p.category, p.title, p.description, p.amount, p.created_at, p.city, p.district,
              u.id AS author_id, u.display_name AS author_name, u.role AS author_role,
              (SELECT ROUND(AVG(stars), 1) FROM ratings WHERE ratee_id = u.id) AS author_avg,
              (SELECT COUNT(*) FROM ratings WHERE ratee_id = u.id) AS author_count
@@ -512,7 +520,7 @@ function createServices(db, options = {}) {
   function dashboard(userId) {
     const user = mustUser(userId);
     const posts = db.prepare(`
-      SELECT p.id, p.kind, p.category, p.description, p.amount, p.status,
+      SELECT p.id, p.kind, p.category, p.title, p.description, p.amount, p.status,
              p.settled_amount, p.created_at, p.author_id,
              a.display_name AS author_name, b.display_name AS accepter_name
       FROM posts p
@@ -593,6 +601,7 @@ function createServices(db, options = {}) {
       id: row.id,
       kind: row.kind,
       category: row.category,
+      title: row.title,
       description: row.description,
       city: row.city,
       district: row.district,

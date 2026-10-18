@@ -7,6 +7,7 @@ const { createServices } = require('./services');
 const { isDevMode } = require('./sms');
 const { ROLES, KINDS, CATEGORIES, STATUSES } = require('./constants');
 const { CITIES, normalizeCity } = require('./places');
+const { templatesFor, findTemplate } = require('./templates');
 const { formatMerit, formatTaipei } = require('./time');
 
 function safeReturn(url) {
@@ -326,7 +327,13 @@ function createApp(options = {}) {
   });
 
   app.get('/posts/new', requireLogin, (req, res) => {
-    res.render('post-new', { title: '發布', cities: CITIES });
+    const templates = templatesFor(res.locals.user.role);
+    res.render('post-new', {
+      title: '發布',
+      cities: CITIES,
+      templates,
+      selected: findTemplate(String(req.query.template || ''), res.locals.user.role),
+    });
   });
 
   app.post('/posts', requireCsrf, requireLogin, (req, res) => {

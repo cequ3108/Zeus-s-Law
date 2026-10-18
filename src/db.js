@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS posts (
   kind TEXT NOT NULL CHECK (kind IN ('offer', 'need')),
   category TEXT NOT NULL CHECK (category IN ('food', 'transport', 'other')),
   description TEXT NOT NULL,
+  title TEXT,
   amount INTEGER NOT NULL CHECK (amount > 0),
   status TEXT NOT NULL CHECK (status IN ('open', 'matched', 'settled', 'cancelled')),
   accepter_id INTEGER REFERENCES users(id),
@@ -112,6 +113,7 @@ function migrate(db) {
   addColumn(db, 'users', 'district', 'TEXT');
   addColumn(db, 'posts', 'city', 'TEXT');
   addColumn(db, 'posts', 'district', 'TEXT');
+  addColumn(db, 'posts', 'title', 'TEXT');
 }
 
 function openDatabase(dbPath) {

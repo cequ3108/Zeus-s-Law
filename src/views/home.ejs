@@ -45,7 +45,7 @@
           <% if (post.city) { %><span class="tag"><%= post.city %><% if (post.district) { %> <%= post.district %><% } %></span><% } %>
           <span>標示 <%= formatMerit(post.amount) %> 功德</span>
         </p>
-        <h2><a href="/posts/<%= post.id %>"><%= kindLabel(post.kind) %> · <%= categoryLabel(post.category) %></a></h2>
+        <h2><a href="/posts/<%= post.id %>"><%= post.title || (kindLabel(post.kind) + ' · ' + categoryLabel(post.category)) %></a></h2>
         <p class="excerpt"><%= post.description %></p>
         <p class="meta">
           <a href="/users/<%= post.author_id %>"><%= post.author_name %></a>

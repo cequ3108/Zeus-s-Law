@@ -8,7 +8,7 @@
     <span><%= statusLabel(model.status) %></span>
     <span><%= formatTaipei(model.createdAt) %></span>
   </p>
-  <h1><%= kindLabel(model.kind) %></h1>
+  <h1><%= model.title || kindLabel(model.kind) %></h1>
   <p class="amount-line">標示 <strong><%= formatMerit(model.amount) %></strong> 功德</p>
   <p class="description"><%= model.description %></p>
   <p class="meta">
