@@ -24,8 +24,17 @@
     <% if (model.author.blocked) { %> · 已封鎖<% } %>
   </p>
 
+  <% if (model.expiresAt) { %>
+    <p class="meta">招募到 <%= formatTaipei(model.expiresAt) %><% if (model.expired) { %>，已過期，廣場上看不到。<% } %></p>
+  <% } %>
+
   <% if (model.status === 'open') { %>
-    <% if (model.canCancel) { %>
+    <% if (model.canRepost) { %>
+      <form method="post" action="/posts/<%= model.id %>/repost">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button type="submit">一鍵重發</button>
+      </form>
+    <% } else if (model.canCancel) { %>
       <form method="post" action="/posts/<%= model.id %>/cancel">
         <input type="hidden" name="_csrf" value="<%= csrf %>">
         <button class="secondary" type="submit">取消這則貼文</button>

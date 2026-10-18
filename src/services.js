@@ -33,6 +33,23 @@ function createServices(db, options = {}) {
     return name;
   }
 
+  function expiryHours(raw) {
+    if (raw == null || raw === '') return 48;
+    const hours = Number(raw);
+    if (hours !== 24 && hours !== 48 && hours !== 72) {
+      throw new AppError('有效時間請選 24、48 或 72 小時。');
+    }
+    return hours;
+  }
+
+  function expiresAt(hours) {
+    return new Date(clock().getTime() + hours * 60 * 60 * 1000).toISOString();
+  }
+
+  function isExpired(post) {
+    return !!(post && post.expires_at && post.expires_at <= clock().toISOString());
+  }
+
   function assertNoCashLanguage(text) {
     const hit = BANNED_PHRASES.find((phrase) => text.includes(phrase));
     if (hit) throw new AppError(`請不要寫「${hit}」。功德不可購買、兌現或轉售。`);
@@ -255,12 +272,16 @@ function createServices(db, options = {}) {
     const city = normalizeCity(input.city);
     const district = cleanDistrict(input.district);
     const title = cleanTitle(input.title);
+    const hours = expiryHours(input.expires_hours);
     const info = db.prepare(`
       INSERT INTO posts (
-        author_id, kind, category, description, amount, status, created_at, city, district, title
+        author_id, kind, category, description, amount, status, created_at, city, district, title, expires_at
       )
-      VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?)
-    `).run(author.id, kind, input.category, description, amount, clock().toISOString(), city, district, title);
+      VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)
+    `).run(
+      author.id, kind, input.category, description, amount, clock().toISOString(),
+      city, district, title, expiresAt(hours),
+    );
     return { id: Number(info.lastInsertRowid) };
   }
 
@@ -275,7 +296,7 @@ function createServices(db, options = {}) {
   function acceptPost(postId, userId) {
     return db.transaction(() => {
       const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
-      if (!post || post.status !== 'open') throw new AppError('這則已經不能接下。');
+      if (!post || post.status !== 'open' || isExpired(post)) throw new AppError('這則已經不能接下。');
       const actor = mustUser(userId);
       const author = mustUser(post.author_id);
       if (actor.blocked) throw new AppError('你的帳號已被封鎖，不能發布或接下。');
@@ -298,6 +319,35 @@ function createServices(db, options = {}) {
       `).run(actor.id, host.id, payer.id, clock().toISOString(), post.id);
       if (changed.changes !== 1) throw new AppError('這則已經不能接下。');
       return { id: post.id };
+    }).immediate();
+  }
+
+  function repostPost(postId, userId) {
+    return db.transaction(() => {
+      const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
+      if (!post || post.author_id !== userId || post.status !== 'open') {
+        throw new AppError('這則不能重發。');
+      }
+      const changed = db.prepare(`
+        UPDATE posts SET status = 'cancelled' WHERE id = ? AND author_id = ? AND status = 'open'
+      `).run(post.id, userId);
+      if (changed.changes !== 1) throw new AppError('這則不能重發。');
+      let hours = 48;
+      if (post.expires_at) {
+        const span = new Date(post.expires_at).getTime() - new Date(post.created_at).getTime();
+        const candidate = Math.round(span / (60 * 60 * 1000));
+        if (candidate === 24 || candidate === 48 || candidate === 72) hours = candidate;
+      }
+      const info = db.prepare(`
+        INSERT INTO posts (
+          author_id, kind, category, description, amount, status, created_at, city, district, title, expires_at
+        )
+        VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)
+      `).run(
+        post.author_id, post.kind, post.category, post.description, post.amount,
+        clock().toISOString(), post.city, post.district, post.title, expiresAt(hours),
+      );
+      return { id: Number(info.lastInsertRowid) };
     }).immediate();
   }
 
@@ -531,8 +581,8 @@ function createServices(db, options = {}) {
   }
 
   function listOpenPosts(filter = {}) {
-    const where = ['p.status = \'open\'', 'u.blocked = 0'];
-    const params = [];
+    const where = ['p.status = \'open\'', 'u.blocked = 0', '(p.expires_at IS NULL OR p.expires_at > ?)'];
+    const params = [clock().toISOString()];
     if (filter.city) {
       where.push('p.city = ?');
       params.push(filter.city);
@@ -556,16 +606,20 @@ function createServices(db, options = {}) {
 
   function dashboard(userId) {
     const user = mustUser(userId);
+    const nowIso = clock().toISOString();
     const posts = db.prepare(`
       SELECT p.id, p.kind, p.category, p.title, p.description, p.amount, p.status,
-             p.settled_amount, p.created_at, p.author_id,
+             p.settled_amount, p.created_at, p.expires_at, p.author_id,
              a.display_name AS author_name, b.display_name AS accepter_name
       FROM posts p
       JOIN users a ON a.id = p.author_id
       LEFT JOIN users b ON b.id = p.accepter_id
       WHERE p.author_id = ? OR p.accepter_id = ?
       ORDER BY p.id DESC
-    `).all(userId, userId);
+    `).all(userId, userId).map((post) => ({
+      ...post,
+      expired: post.status === 'open' && post.expires_at && post.expires_at <= nowIso,
+    }));
     return { user, posts, ...ratingSummary(userId), application: latestApplication(userId) };
   }
 
@@ -611,7 +665,8 @@ function createServices(db, options = {}) {
 
     let canAccept = false;
     let acceptHint = null;
-    if (row.status === 'open' && viewer && viewer.id !== row.author_id) {
+    const expired = isExpired(row);
+    if (row.status === 'open' && !expired && viewer && viewer.id !== row.author_id) {
       if (viewer.blocked) {
         acceptHint = '你的帳號已被封鎖，不能接下。';
       } else if (row.author_blocked) {
@@ -684,7 +739,10 @@ function createServices(db, options = {}) {
       seekerValue: settled ? row.seeker_value : null,
       canAccept,
       acceptHint,
-      canCancel: !!(viewer && viewer.id === row.author_id && row.status === 'open'),
+      expiresAt: row.expires_at,
+      expired,
+      canCancel: !!(viewer && viewer.id === row.author_id && row.status === 'open' && !expired),
+      canRepost: !!(viewer && viewer.id === row.author_id && row.status === 'open' && expired),
       canSubmitValue: !!(isParty && row.status === 'matched'),
       canRetrySettle: !!(isParty && row.status === 'matched' && row.host_value != null && row.seeker_value != null),
       canRate: !!(isParty && settled && !myRating),
@@ -742,6 +800,7 @@ function createServices(db, options = {}) {
     createPost,
     updateAccountPlace,
     acceptPost,
+    repostPost,
     cancelPost,
     submitValue,
     retrySettle,

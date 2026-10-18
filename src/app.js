@@ -375,6 +375,21 @@ function createApp(options = {}) {
     }
   });
 
+  app.post('/posts/:id/repost', requireCsrf, requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    const back = `/posts/${req.params.id}`;
+    if (!id) {
+      res.redirect('/me');
+      return;
+    }
+    try {
+      const post = services.repostPost(id, res.locals.user.id);
+      redirectWith(req, res, `/posts/${post.id}`, { type: 'ok', message: '已重發。原來那則已取消。' });
+    } catch (err) {
+      handle(err, req, res, back);
+    }
+  });
+
   app.post('/posts/:id/cancel', requireCsrf, requireLogin, (req, res) => {
     const id = parseId(req.params.id);
     const back = `/posts/${req.params.id}`;

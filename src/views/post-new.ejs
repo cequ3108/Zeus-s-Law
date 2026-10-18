@@ -68,6 +68,15 @@
         <% }) %>
       </div>
       <div class="field">
+        <label for="expires_hours">招募多久</label>
+        <select id="expires_hours" name="expires_hours">
+          <option value="24">24 小時</option>
+          <option value="48" selected>48 小時</option>
+          <option value="72">72 小時</option>
+        </select>
+        <p class="hint">時間到了會從廣場消失。你可以在我的交易一鍵重發。</p>
+      </div>
+      <div class="field">
         <label for="description">描述</label>
         <textarea id="description" name="description" required maxlength="1000" placeholder="需要什麼、可以提供什麼、在哪個區域、大約什麼時候。"><%= selected ? selected.description : '' %></textarea>
       </div>

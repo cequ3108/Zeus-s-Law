@@ -39,7 +39,7 @@
     <article class="card">
       <p class="meta">
         <span class="tag tag-<%= post.kind %>"><%= kindLabel(post.kind) %></span>
-        <span><%= statusLabel(post.status) %></span>
+        <span><%= post.expired ? '已過期' : statusLabel(post.status) %></span>
         <span>標示 <%= formatMerit(post.amount) %></span>
         <% if (post.settled_amount != null) { %><span>結算 <%= formatMerit(post.settled_amount) %></span><% } %>
       </p>
@@ -48,6 +48,12 @@
         <%= post.author_name %>
         <% if (post.accepter_name) { %> · <%= post.accepter_name %><% } %>
       </p>
+      <% if (post.expired) { %>
+        <form method="post" action="/posts/<%= post.id %>/repost">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button type="submit">一鍵重發</button>
+        </form>
+      <% } %>
     </article>
   <% }) %>
 </main>
