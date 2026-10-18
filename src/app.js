@@ -314,7 +314,11 @@ function createApp(options = {}) {
   });
 
   app.get('/account', requireLogin, (req, res) => {
-    res.render('account', { title: '我的帳號', cities: CITIES });
+    res.render('account', {
+      title: '我的帳號',
+      cities: CITIES,
+      week: services.weeklySummary(res.locals.user.id),
+    });
   });
 
   app.post('/account', requireCsrf, requireLogin, (req, res) => {

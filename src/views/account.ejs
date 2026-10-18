@@ -27,6 +27,12 @@
     </div>
     <button type="submit">儲存</button>
   </form>
+  <section class="card" data-spent="<%= week.spent %>" data-received="<%= week.received %>" data-quota-gained="<%= week.quotaGained %>">
+    <h2>本週功德進出</h2>
+    <p class="meta"><%= week.start %> 到 <%= week.end %>（台北時間，週一開始）</p>
+    <p>支出 <%= formatMerit(week.spent) %> · 收入 <%= formatMerit(week.received) %> · 額度增加 <%= formatMerit(week.quotaGained) %></p>
+    <p class="hint">只顯示在你自己的帳號頁，公開個人頁看不到這三個數字。</p>
+  </section>
   <p><a class="button" href="/users/<%= user.id %>">看公開個人頁</a></p>
   <p><a href="/me">回到我的交易</a></p>
 </main>

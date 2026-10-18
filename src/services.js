@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { AppError } = require('./errors');
 const { CATEGORIES, ENDOWMENTS, MAX_AMOUNT } = require('./constants');
-const { taipeiDate } = require('./time');
+const { taipeiDate, weekRange } = require('./time');
 const sms = require('./sms');
 const { cleanPassword, hashPassword, verifyPassword } = require('./password');
 const { normalizeCity, cleanDistrict } = require('./places');
@@ -613,6 +613,27 @@ function createServices(db, options = {}) {
     };
   }
 
+  function weeklySummary(userId) {
+    const range = weekRange(clock());
+    const spent = db.prepare(`
+      SELECT COALESCE(SUM(settled_amount), 0) AS total
+      FROM posts
+      WHERE seeker_id = ? AND status = 'settled' AND settled_on >= ? AND settled_on <= ?
+    `).get(userId, range.start, range.end).total;
+    const received = db.prepare(`
+      SELECT COALESCE(SUM(settled_amount), 0) AS total
+      FROM posts
+      WHERE host_id = ? AND status = 'settled' AND settled_on >= ? AND settled_on <= ?
+    `).get(userId, range.start, range.end).total;
+    const quotaGained = db.prepare(`
+      SELECT COALESCE(SUM(settled_amount), 0) AS total
+      FROM posts
+      WHERE status = 'settled' AND settled_on >= ? AND settled_on <= ?
+        AND (host_id = ? OR seeker_id = ?)
+    `).get(range.start, range.end, userId, userId).total;
+    return { ...range, spent, received, quotaGained };
+  }
+
   function listOpenPosts(filter = {}) {
     const where = ['p.status = \'open\'', 'u.blocked = 0', '(p.expires_at IS NULL OR p.expires_at > ?)'];
     const params = [clock().toISOString()];
@@ -874,6 +895,7 @@ function createServices(db, options = {}) {
     latestApplication,
     listOpenPosts,
     priceHint,
+    weeklySummary,
     dashboard,
     getProfile,
     postPage,
