@@ -115,15 +115,41 @@ function createServices(db, options = {}) {
       INSERT INTO users (mobile, display_name, role, merit, quota, blocked, created_at, password_hash)
       VALUES (?, ?, ?, ?, ?, 0, ?, ?)
     `).run(mobile, displayName, role, endowment.merit, endowment.quota, clock().toISOString(), passwordHash);
-    return mustUser(Number(info.lastInsertRowid));
+    const user = mustUser(Number(info.lastInsertRowid));
+    const reason = role === 'founder' ? 'founder_seed' : role === 'org' ? 'org_create' : 'signup';
+    recordLedger({ userId: user.id, deltaMerit: user.merit, deltaQuota: user.quota, reason });
+    return user;
+  }
+
+  function recordLedger({ userId, deltaMerit, deltaQuota, reason, postId = null, counterpartyId = null }) {
+    const user = db.prepare('SELECT merit, quota FROM users WHERE id = ?').get(userId);
+    db.prepare(`
+      INSERT INTO ledger (
+        created_at, user_id, delta_merit, delta_quota, merit_after, quota_after,
+        reason, post_id, counterparty_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      clock().toISOString(), userId, deltaMerit, deltaQuota, user.merit, user.quota,
+      reason, postId, counterpartyId,
+    );
   }
 
   function endow(user, role, floor) {
     if (user.role === role) return user;
     const merit = Math.max(user.merit, floor.merit);
     const quota = Math.max(user.quota, floor.quota, merit);
+    const deltaMerit = merit - user.merit;
+    const deltaQuota = quota - user.quota;
     db.prepare('UPDATE users SET role = ?, merit = ?, quota = ? WHERE id = ?')
       .run(role, merit, quota, user.id);
+    if (deltaMerit !== 0 || deltaQuota !== 0) {
+      recordLedger({
+        userId: user.id,
+        deltaMerit,
+        deltaQuota,
+        reason: role === 'founder' ? 'founder_endow' : 'org_endow',
+      });
+    }
     return mustUser(user.id);
   }
 
@@ -445,6 +471,23 @@ function createServices(db, options = {}) {
         throw new AppError('結算會讓功德變成負數或超過額度，已取消，餘額沒有變動。');
       }
     }
+
+    recordLedger({
+      userId: post.seeker_id,
+      deltaMerit: -amount,
+      deltaQuota: amount,
+      reason: 'settle_spend',
+      postId: post.id,
+      counterpartyId: post.host_id,
+    });
+    recordLedger({
+      userId: post.host_id,
+      deltaMerit: amount,
+      deltaQuota: amount,
+      reason: 'settle_receive',
+      postId: post.id,
+      counterpartyId: post.seeker_id,
+    });
 
     return { status: 'settled', amount, hostValue, seekerValue, date };
   }
@@ -865,7 +908,15 @@ function createServices(db, options = {}) {
         lookup = { error: err.message };
       }
     }
-    return { applications, blocked, lookup };
+    const ledger = db.prepare(`
+      SELECT l.id, l.created_at, l.delta_merit, l.delta_quota, l.merit_after, l.quota_after,
+             l.reason, l.post_id, u.display_name
+      FROM ledger l
+      JOIN users u ON u.id = l.user_id
+      ORDER BY l.id DESC
+      LIMIT 30
+    `).all();
+    return { applications, blocked, lookup, ledger };
   }
 
   return {

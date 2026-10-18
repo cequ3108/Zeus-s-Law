@@ -52,6 +52,15 @@ function createApp(options = {}) {
   app.locals.kindLabel = (kind) => KINDS[kind] || kind;
   app.locals.categoryLabel = (category) => CATEGORIES[category] || category;
   app.locals.statusLabel = (status) => STATUSES[status] || status;
+  app.locals.ledgerReason = (reason) => ({
+    signup: '註冊',
+    founder_seed: '建立創辦人',
+    org_create: '建立機構',
+    founder_endow: '升為創辦人',
+    org_endow: '升為機構',
+    settle_spend: '結算支出',
+    settle_receive: '結算收入',
+  }[reason] || reason);
   app.locals.starGlyph = (value) => {
     if (value == null) return '';
     const full = Math.max(0, Math.min(5, Math.round(Number(value))));

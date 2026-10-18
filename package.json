@@ -10,7 +10,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --test",
-    "seed:founder": "node scripts/seed-founder.js"
+    "seed:founder": "node scripts/seed-founder.js",
+    "backup": "node scripts/backup.js"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

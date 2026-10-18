@@ -93,6 +93,33 @@ CREATE TABLE IF NOT EXISTS ratings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ratings_ratee ON ratings (ratee_id);
+
+CREATE TABLE IF NOT EXISTS ledger (
+  id INTEGER PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  delta_merit INTEGER NOT NULL,
+  delta_quota INTEGER NOT NULL,
+  merit_after INTEGER NOT NULL,
+  quota_after INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  post_id INTEGER REFERENCES posts(id),
+  counterparty_id INTEGER REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ledger_user ON ledger (user_id, id);
+
+CREATE TRIGGER IF NOT EXISTS ledger_no_update
+BEFORE UPDATE ON ledger
+BEGIN
+  SELECT RAISE(ABORT, 'ledger is append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS ledger_no_delete
+BEFORE DELETE ON ledger
+BEGIN
+  SELECT RAISE(ABORT, 'ledger is append-only');
+END;
 `;
 
 function resolveDbPath(env = process.env) {

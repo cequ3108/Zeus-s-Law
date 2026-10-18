@@ -80,6 +80,23 @@
   </section>
 
   <section class="card">
+    <h2>功德帳本</h2>
+    <p class="hint">每一筆只追加，不能改、不能刪。這裡只給創辦人看。</p>
+    <% if (!data.ledger.length) { %><p class="empty">還沒有紀錄。</p><% } %>
+    <% data.ledger.forEach(function (row) { %>
+      <p class="meta">
+        <%= formatTaipei(row.created_at) %>
+        · <%= row.display_name %>
+        · <%= ledgerReason(row.reason) %>
+        · 功德 <%= row.delta_merit > 0 ? '+' : '' %><%= formatMerit(row.delta_merit) %>
+        · 額度 <%= row.delta_quota > 0 ? '+' : '' %><%= formatMerit(row.delta_quota) %>
+        · 之後 <%= formatMerit(row.merit_after) %> / <%= formatMerit(row.quota_after) %>
+        <% if (row.post_id) { %> · <a href="/posts/<%= row.post_id %>">互助</a><% } %>
+      </p>
+    <% }) %>
+  </section>
+
+  <section class="card">
     <h2>已封鎖</h2>
     <% if (!data.blocked.length) { %><p class="empty">目前沒有被封鎖的帳號。</p><% } %>
     <% data.blocked.forEach(function (item) { %>
