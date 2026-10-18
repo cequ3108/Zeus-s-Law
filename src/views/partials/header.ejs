@@ -7,12 +7,8 @@
     <p class="seal">禁現金</p>
   </div>
   <nav class="wrap">
-    <a href="/">廣場</a>
     <a href="/rules">規範</a>
     <% if (user) { %>
-      <% if (!user.blocked) { %><a href="/posts/new">發布</a><% } %>
-      <a href="/me">我的</a>
-      <a href="/users/<%= user.id %>">個人頁</a>
       <% if (user.role === 'founder') { %><a href="/admin">管理</a><% } %>
       <form class="nav-form" method="post" action="/logout">
         <input type="hidden" name="_csrf" value="<%= csrf %>">

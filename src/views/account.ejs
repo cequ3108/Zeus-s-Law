@@ -1,0 +1,10 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap narrow">
+  <h1>我的帳號</h1>
+  <p class="meta"><%= user.display_name %> · <%= roleLabel(user.role) %></p>
+  <p>手機 <strong><%= user.mobile %></strong> 只在帳號頁顯示，公開個人頁看不到。</p>
+  <p><a class="button" href="/users/<%= user.id %>">看公開個人頁</a></p>
+  <p><a href="/me">回到我的交易</a></p>
+</main>
+<%- include('partials/footer') %>

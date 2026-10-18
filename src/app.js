@@ -84,6 +84,7 @@ function createApp(options = {}) {
     res.locals.flash = req.session.flash || null;
     delete req.session.flash;
     res.locals.devSms = isDevMode();
+    res.locals.currentPath = req.path;
     res.locals.user = null;
     if (req.session.userId) {
       res.locals.user = options.db.prepare(`
@@ -288,7 +289,11 @@ function createApp(options = {}) {
   });
 
   app.get('/me', requireLogin, (req, res) => {
-    res.render('me', { title: '我的', dash: services.dashboard(res.locals.user.id) });
+    res.render('me', { title: '我的交易', dash: services.dashboard(res.locals.user.id) });
+  });
+
+  app.get('/account', requireLogin, (req, res) => {
+    res.render('account', { title: '我的帳號' });
   });
 
   app.get('/posts/new', requireLogin, (req, res) => {

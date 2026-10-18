@@ -1,7 +1,8 @@
 <%- include('partials/head') %>
 <%- include('partials/header') %>
 <main class="wrap">
-  <h1><%= dash.user.display_name %></h1>
+  <h1>我的交易</h1>
+  <p class="meta"><%= dash.user.display_name %></p>
   <p class="meta"><%= roleLabel(dash.user.role) %> · <%= dash.user.mobile %></p>
   <section class="balances" aria-label="餘額">
     <article class="card balance">
