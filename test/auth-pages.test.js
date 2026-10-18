@@ -84,7 +84,10 @@ test('登入頁只有密碼登入，記住我會保留 30 天並記住手機號�
     assert.match(page.text, /name="remember" value="1" checked/);
     assert.match(page.text, /href="\/join"/);
     assert.match(page.text, /href="\/forgot"/);
-    assert.match(page.text, /用驗證碼登入/);
+    assert.equal(page.text.includes('用驗證碼登入'), false);
+    const forgot = await request(app.base, jar, '/forgot');
+    assert.match(forgot.text, /用驗證碼登入/);
+    assert.match(forgot.text, /href="\/login\/code"/);
     assert.equal(page.text.includes('name="display_name"'), false);
     assert.equal(page.text.includes('action="/join"'), false);
     assert.equal(page.text.includes('請不要留下真實個資'), false);
