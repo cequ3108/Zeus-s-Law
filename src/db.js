@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS users (
   blocked INTEGER NOT NULL DEFAULT 0 CHECK (blocked IN (0, 1)),
   block_reason TEXT,
   password_hash TEXT,
+  city TEXT,
+  district TEXT,
   created_at TEXT NOT NULL,
   CHECK (merit >= 0),
   CHECK (quota >= 0),
@@ -55,7 +57,9 @@ CREATE TABLE IF NOT EXISTS posts (
   settled_on TEXT,
   created_at TEXT NOT NULL,
   matched_at TEXT,
-  settled_at TEXT
+  settled_at TEXT,
+  city TEXT,
+  district TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_posts_status ON posts (status, id);
@@ -104,6 +108,10 @@ function addColumn(db, table, column, definition) {
 
 function migrate(db) {
   addColumn(db, 'users', 'password_hash', 'TEXT');
+  addColumn(db, 'users', 'city', 'TEXT');
+  addColumn(db, 'users', 'district', 'TEXT');
+  addColumn(db, 'posts', 'city', 'TEXT');
+  addColumn(db, 'posts', 'district', 'TEXT');
 }
 
 function openDatabase(dbPath) {

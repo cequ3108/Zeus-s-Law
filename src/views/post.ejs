@@ -4,6 +4,7 @@
   <p class="meta">
     <span class="tag tag-<%= model.kind %>"><%= kindLabel(model.kind) %></span>
     <span class="tag"><%= categoryLabel(model.category) %></span>
+    <% if (model.city) { %><span class="tag"><%= model.city %><% if (model.district) { %> <%= model.district %><% } %></span><% } %>
     <span><%= statusLabel(model.status) %></span>
     <span><%= formatTaipei(model.createdAt) %></span>
   </p>

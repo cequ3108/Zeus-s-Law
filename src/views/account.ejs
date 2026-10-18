@@ -4,6 +4,24 @@
   <h1>我的帳號</h1>
   <p class="meta"><%= user.display_name %> · <%= roleLabel(user.role) %></p>
   <p>手機 <strong><%= user.mobile %></strong> 只在帳號頁顯示，公開個人頁看不到。</p>
+  <form method="post" action="/account">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="field">
+      <label for="city">我的縣市</label>
+      <select id="city" name="city">
+        <option value="">先不設定</option>
+        <% cities.forEach(function (city) { %>
+          <option value="<%= city %>" <%= user.city === city ? 'selected' : '' %>><%= city %></option>
+        <% }) %>
+      </select>
+      <p class="hint">設定之後，首頁會先顯示這個縣市。選「全部」仍看得到其他地方，也看得到還沒填縣市的舊貼文。</p>
+    </div>
+    <div class="field">
+      <label for="district">行政區（可以不填）</label>
+      <input id="district" name="district" maxlength="20" value="<%= user.district || '' %>">
+    </div>
+    <button type="submit">儲存縣市</button>
+  </form>
   <p><a class="button" href="/users/<%= user.id %>">看公開個人頁</a></p>
   <p><a href="/me">回到我的交易</a></p>
 </main>

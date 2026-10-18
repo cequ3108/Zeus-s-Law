@@ -32,6 +32,7 @@ function post(services, authorId, overrides = {}) {
     category: 'food',
     description: '需要一份便當',
     amount: 40,
+    city: '臺北市',
     ...overrides,
   });
 }

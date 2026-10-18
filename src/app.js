@@ -6,6 +6,7 @@ const { AppError } = require('./errors');
 const { createServices } = require('./services');
 const { isDevMode } = require('./sms');
 const { ROLES, KINDS, CATEGORIES, STATUSES } = require('./constants');
+const { CITIES, normalizeCity } = require('./places');
 const { formatMerit, formatTaipei } = require('./time');
 
 function safeReturn(url) {
@@ -88,7 +89,7 @@ function createApp(options = {}) {
     res.locals.user = null;
     if (req.session.userId) {
       res.locals.user = options.db.prepare(`
-        SELECT id, mobile, display_name, role, merit, quota, blocked, block_reason
+        SELECT id, mobile, display_name, role, merit, quota, blocked, block_reason, city, district
         FROM users WHERE id = ?
       `).get(req.session.userId) || null;
       if (!res.locals.user) delete req.session.userId;
@@ -151,7 +152,26 @@ function createApp(options = {}) {
   });
 
   app.get('/', (req, res) => {
-    res.render('home', { title: '廣場', posts: services.listOpenPosts() });
+    const rawCity = String(req.query.city || '').trim();
+    let city = rawCity;
+    if (!rawCity && res.locals.user && res.locals.user.city) city = res.locals.user.city;
+    if (rawCity === 'all') city = '';
+    let normalized = '';
+    if (city) {
+      try {
+        normalized = normalizeCity(city);
+      } catch (err) {
+        if (!(err instanceof AppError)) throw err;
+      }
+    }
+    const category = CATEGORIES[req.query.category] ? req.query.category : '';
+    res.render('home', {
+      title: '廣場',
+      posts: services.listOpenPosts({ city: normalized || null, category: category || null }),
+      cities: CITIES,
+      filterCity: normalized || 'all',
+      filterCategory: category,
+    });
   });
 
   app.get('/rules', (req, res) => {
@@ -293,11 +313,20 @@ function createApp(options = {}) {
   });
 
   app.get('/account', requireLogin, (req, res) => {
-    res.render('account', { title: '我的帳號' });
+    res.render('account', { title: '我的帳號', cities: CITIES });
+  });
+
+  app.post('/account', requireCsrf, requireLogin, (req, res) => {
+    try {
+      services.updateAccountPlace(res.locals.user.id, req.body);
+      redirectWith(req, res, '/account', { type: 'ok', message: '已記下你的縣市。首頁會先顯示這裡的招募。' });
+    } catch (err) {
+      handle(err, req, res, '/account');
+    }
   });
 
   app.get('/posts/new', requireLogin, (req, res) => {
-    res.render('post-new', { title: '發布' });
+    res.render('post-new', { title: '發布', cities: CITIES });
   });
 
   app.post('/posts', requireCsrf, requireLogin, (req, res) => {

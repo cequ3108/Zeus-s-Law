@@ -119,6 +119,7 @@ test('從註冊到結算、每日一次，以及星等不顯示備註', async ()
         kind: 'need',
         category: 'food',
         amount: '40',
+        city: '臺北市',
         description: '需要一份午餐便當，在公館。',
       },
     });
@@ -169,6 +170,7 @@ test('從註冊到結算、每日一次，以及星等不顯示備註', async ()
         kind: 'need',
         category: 'transport',
         amount: '10',
+        city: '臺北市',
         description: '同一天再請求一次接送。',
       },
     });
@@ -232,6 +234,7 @@ test('從註冊到結算、每日一次，以及星等不顯示備註', async ()
         kind: 'offer',
         category: 'other',
         amount: '10',
+        city: '臺北市',
         description: '<img src=x onerror=alert(1)>',
       },
     });

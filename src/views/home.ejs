@@ -4,6 +4,27 @@
   <section class="hero">
     <h1>今天可以接的互助</h1>
     <p>食物、交通，或其他需要。你可以寫「我可以提供」，也可以寫「我需要」。標一個功德金額，最後以雙方認定的較低者結算。</p>
+    <form class="filter" method="get" action="/">
+      <div class="field">
+        <label for="filter-city">縣市</label>
+        <select id="filter-city" name="city">
+          <option value="all" <%= filterCity === 'all' ? 'selected' : '' %>>全部</option>
+          <% cities.forEach(function (city) { %>
+            <option value="<%= city %>" <%= filterCity === city ? 'selected' : '' %>><%= city %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="field">
+        <label for="filter-category">種類</label>
+        <select id="filter-category" name="category">
+          <option value="">全部</option>
+          <option value="food" <%= filterCategory === 'food' ? 'selected' : '' %>>食物</option>
+          <option value="transport" <%= filterCategory === 'transport' ? 'selected' : '' %>>交通</option>
+          <option value="other" <%= filterCategory === 'other' ? 'selected' : '' %>>其他</option>
+        </select>
+      </div>
+      <button type="submit">篩選</button>
+    </form>
     <% if (!user) { %>
       <p><a class="button" href="/login">用手機號碼加入</a></p>
     <% } else if (!user.blocked) { %>
@@ -21,6 +42,7 @@
         <p class="meta">
           <span class="tag tag-<%= post.kind %>"><%= kindLabel(post.kind) %></span>
           <span class="tag"><%= categoryLabel(post.category) %></span>
+          <% if (post.city) { %><span class="tag"><%= post.city %><% if (post.district) { %> <%= post.district %><% } %></span><% } %>
           <span>標示 <%= formatMerit(post.amount) %> 功德</span>
         </p>
         <h2><a href="/posts/<%= post.id %>"><%= kindLabel(post.kind) %> · <%= categoryLabel(post.category) %></a></h2>

@@ -4,6 +4,7 @@ const { CATEGORIES, ENDOWMENTS, MAX_AMOUNT } = require('./constants');
 const { taipeiDate } = require('./time');
 const sms = require('./sms');
 const { cleanPassword, hashPassword, verifyPassword } = require('./password');
+const { normalizeCity, cleanDistrict } = require('./places');
 
 function createServices(db, options = {}) {
   const now = options.now || (() => new Date());
@@ -235,11 +236,23 @@ function createServices(db, options = {}) {
     if (!CATEGORIES[input.category]) throw new AppError('請選擇食物、交通或其他。');
     const description = cleanText(input.description, '描述');
     const amount = parseAmount(input.amount, '金額', 1);
+    const city = normalizeCity(input.city);
+    const district = cleanDistrict(input.district);
     const info = db.prepare(`
-      INSERT INTO posts (author_id, kind, category, description, amount, status, created_at)
-      VALUES (?, ?, ?, ?, ?, 'open', ?)
-    `).run(author.id, kind, input.category, description, amount, clock().toISOString());
+      INSERT INTO posts (
+        author_id, kind, category, description, amount, status, created_at, city, district
+      )
+      VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?)
+    `).run(author.id, kind, input.category, description, amount, clock().toISOString(), city, district);
     return { id: Number(info.lastInsertRowid) };
+  }
+
+  function updateAccountPlace(userId, input) {
+    const city = normalizeCity(input.city, { required: false });
+    const district = cleanDistrict(input.district);
+    if (district && !city) throw new AppError('要填行政區，請先選擇縣市。');
+    db.prepare('UPDATE users SET city = ?, district = ? WHERE id = ?').run(city, district, userId);
+    return mustUser(userId);
   }
 
   function acceptPost(postId, userId) {
@@ -472,18 +485,28 @@ function createServices(db, options = {}) {
     `).get(userId) || null;
   }
 
-  function listOpenPosts() {
+  function listOpenPosts(filter = {}) {
+    const where = ['p.status = \'open\'', 'u.blocked = 0'];
+    const params = [];
+    if (filter.city) {
+      where.push('p.city = ?');
+      params.push(filter.city);
+    }
+    if (filter.category && CATEGORIES[filter.category]) {
+      where.push('p.category = ?');
+      params.push(filter.category);
+    }
     return db.prepare(`
-      SELECT p.id, p.kind, p.category, p.description, p.amount, p.created_at,
+      SELECT p.id, p.kind, p.category, p.description, p.amount, p.created_at, p.city, p.district,
              u.id AS author_id, u.display_name AS author_name, u.role AS author_role,
              (SELECT ROUND(AVG(stars), 1) FROM ratings WHERE ratee_id = u.id) AS author_avg,
              (SELECT COUNT(*) FROM ratings WHERE ratee_id = u.id) AS author_count
       FROM posts p
       JOIN users u ON u.id = p.author_id
-      WHERE p.status = 'open' AND u.blocked = 0
+      WHERE ${where.join(' AND ')}
       ORDER BY p.id DESC
       LIMIT 50
-    `).all();
+    `).all(...params);
   }
 
   function dashboard(userId) {
@@ -571,6 +594,8 @@ function createServices(db, options = {}) {
       kind: row.kind,
       category: row.category,
       description: row.description,
+      city: row.city,
+      district: row.district,
       amount: row.amount,
       status: row.status,
       createdAt: row.created_at,
@@ -669,6 +694,7 @@ function createServices(db, options = {}) {
     ensureFounderFromEnv,
     seedFounder,
     createPost,
+    updateAccountPlace,
     acceptPost,
     cancelPost,
     submitValue,

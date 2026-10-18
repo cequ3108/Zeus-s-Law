@@ -28,6 +28,19 @@
         </select>
       </div>
       <div class="field">
+        <label for="city">縣市</label>
+        <select id="city" name="city" required>
+          <option value="">請選擇</option>
+          <% cities.forEach(function (city) { %>
+            <option value="<%= city %>" <%= user.city === city ? 'selected' : '' %>><%= city %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="field">
+        <label for="district">行政區（可以不填）</label>
+        <input id="district" name="district" maxlength="20" value="<%= user.district || '' %>" placeholder="例如 大安區">
+      </div>
+      <div class="field">
         <label for="amount">標示金額（功德／新台幣）</label>
         <input id="amount" name="amount" inputmode="numeric" min="1" step="1" required>
         <p class="hint">一般使用者若是付出功德的一方，功德減去這個金額後必須大於 0，才接得成。</p>

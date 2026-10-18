@@ -120,6 +120,12 @@ main { padding-top: 8px; }
 .flash-err { background: #fde8e4; color: #6d1a16; }
 
 form { margin: 12px 0 20px; }
+.filter { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; }
+.filter .field { margin: 0; }
+.filter button { margin-bottom: 0; }
+@media (max-width: 560px) {
+  .filter { grid-template-columns: 1fr; }
+}
 .field { margin-bottom: 14px; }
 label, legend { font-weight: 650; }
 fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
