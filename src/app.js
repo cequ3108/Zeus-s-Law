@@ -328,11 +328,16 @@ function createApp(options = {}) {
 
   app.get('/posts/new', requireLogin, (req, res) => {
     const templates = templatesFor(res.locals.user.role);
+    const hintCity = res.locals.user.city || null;
     res.render('post-new', {
       title: '發布',
       cities: CITIES,
       templates,
       selected: findTemplate(String(req.query.template || ''), res.locals.user.role),
+      hints: ['food', 'transport', 'other'].map((category) => ({
+        category,
+        hint: services.priceHint(category, hintCity),
+      })),
     });
   });
 

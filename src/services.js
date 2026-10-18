@@ -5,6 +5,9 @@ const { taipeiDate } = require('./time');
 const sms = require('./sms');
 const { cleanPassword, hashPassword, verifyPassword } = require('./password');
 const { normalizeCity, cleanDistrict } = require('./places');
+const { TEMPLATES } = require('./templates');
+
+const BANNED_PHRASES = ['現金', '轉帳給我', '匯款', '付錢'];
 
 function createServices(db, options = {}) {
   const now = options.now || (() => new Date());
@@ -28,6 +31,11 @@ function createServices(db, options = {}) {
       throw new AppError(`名稱請填 1 到 ${max} 個字。`);
     }
     return name;
+  }
+
+  function assertNoCashLanguage(text) {
+    const hit = BANNED_PHRASES.find((phrase) => text.includes(phrase));
+    if (hit) throw new AppError(`請不要寫「${hit}」。功德不可購買、兌現或轉售。`);
   }
 
   function cleanTitle(raw) {
@@ -243,6 +251,7 @@ function createServices(db, options = {}) {
     if (!CATEGORIES[input.category]) throw new AppError('請選擇食物、交通或其他。');
     const description = cleanText(input.description, '描述');
     const amount = parseAmount(input.amount, '金額', 1);
+    assertNoCashLanguage(`${input.title || ''}\n${description}`);
     const city = normalizeCity(input.city);
     const district = cleanDistrict(input.district);
     const title = cleanTitle(input.title);
@@ -493,6 +502,34 @@ function createServices(db, options = {}) {
     `).get(userId) || null;
   }
 
+  function priceHint(category, city) {
+    if (!CATEGORIES[category]) return null;
+    const rows = city
+      ? db.prepare(`
+          SELECT settled_amount FROM posts
+          WHERE status = 'settled' AND category = ? AND city = ? AND settled_amount > 0
+          ORDER BY id DESC LIMIT 20
+        `).all(category, city)
+      : [];
+    if (rows.length) {
+      const amounts = rows.map((row) => row.settled_amount).sort((a, b) => a - b);
+      return {
+        source: 'history',
+        count: amounts.length,
+        low: amounts[0],
+        high: amounts[amounts.length - 1],
+        typical: amounts[Math.floor((amounts.length - 1) / 2)],
+      };
+    }
+    const items = TEMPLATES.filter((item) => item.category === category);
+    if (!items.length) return null;
+    return {
+      source: 'template',
+      low: Math.min(...items.map((item) => item.min)),
+      high: Math.max(...items.map((item) => item.max)),
+    };
+  }
+
   function listOpenPosts(filter = {}) {
     const where = ['p.status = \'open\'', 'u.blocked = 0'];
     const params = [];
@@ -717,6 +754,7 @@ function createServices(db, options = {}) {
     rejectApplication,
     latestApplication,
     listOpenPosts,
+    priceHint,
     dashboard,
     getProfile,
     postPage,

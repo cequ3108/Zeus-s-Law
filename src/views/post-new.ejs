@@ -57,7 +57,15 @@
       <div class="field">
         <label for="amount">標示金額（功德／新台幣）</label>
         <input id="amount" name="amount" inputmode="numeric" min="1" step="1" required placeholder="<%= selected ? '建議 ' + selected.min + '–' + selected.max : '' %>">
+        <p class="hint">約 1 元價值，僅供估價參考。功德不可購買、兌現或轉售。</p>
         <p class="hint">一般使用者若是付出功德的一方，功德減去這個金額後必須大於 0，才接得成。</p>
+        <% hints.forEach(function (item) { %>
+          <% if (item.hint && item.hint.source === 'history') { %>
+            <p class="hint"><%= categoryLabel(item.category) %>：這個縣市近期結算 <%= item.hint.low %>–<%= item.hint.high %>（<%= item.hint.count %> 筆）。</p>
+          <% } else if (item.hint) { %>
+            <p class="hint"><%= categoryLabel(item.category) %>：這個縣市還沒有結算紀錄，模板建議 <%= item.hint.low %>–<%= item.hint.high %>。</p>
+          <% } %>
+        <% }) %>
       </div>
       <div class="field">
         <label for="description">描述</label>
