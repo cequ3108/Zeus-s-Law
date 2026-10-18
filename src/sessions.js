@@ -65,7 +65,9 @@ function expiryOf(sess) {
   const parsed = expires ? new Date(expires).getTime() : NaN;
   if (Number.isFinite(parsed)) return parsed;
   const maxAge = sess && sess.cookie && sess.cookie.maxAge;
-  return Date.now() + (Number.isFinite(maxAge) ? maxAge : 24 * 60 * 60 * 1000);
+  if (Number.isFinite(maxAge)) return Date.now() + maxAge;
+  // 瀏覽器工作階段 cookie 沒有到期日，資料庫仍保留，關掉瀏覽器後 cookie 自己消失。
+  return Date.now() + 30 * 24 * 60 * 60 * 1000;
 }
 
 module.exports = { SqliteStore };

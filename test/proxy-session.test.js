@@ -150,7 +150,7 @@ test('沒有 cookie 的登入會回到登入表單，並帶新的工作階段', 
     assert.equal(stale.status, 403);
     assert.match(stale.text, /請再送出一次/);
     assert.match(stale.text, /name="_csrf"/);
-    assert.match(stale.text, /密碼登入/);
+    assert.match(stale.text, /記住我/);
     assert.match(stale.cookies.join(';'), /zeus\.sid=/);
     assert.equal(stale.text.includes('表單已過期，請回上一頁'), false);
   } finally {

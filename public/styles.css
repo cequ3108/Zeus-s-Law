@@ -209,3 +209,37 @@ button + button, form + form { margin-top: 8px; }
   .brand { font-size: 1.7rem; letter-spacing: 0.08em; }
   h1 { font-size: 1.7rem; }
 }
+
+body.auth { padding-bottom: 62px; }
+body.auth .masthead { padding: 8px 0 0; }
+body.auth .tagline,
+body.auth nav,
+body.auth .seal,
+body.auth .site-footer { display: none; }
+body.auth .brand { font-size: 1.35rem; letter-spacing: 0.08em; }
+body.auth .cash-banner,
+body.auth .dev-banner { padding: 3px 12px; font-size: 0.82rem; line-height: 1.35; }
+body.auth main { padding-top: 0; }
+body.auth h1 { font-size: 1.35rem; margin: 8px 0; }
+body.auth .hint { margin: 0 0 8px; font-size: 0.92rem; }
+body.auth .auth-card { margin: 0; padding: 12px 14px 10px; }
+body.auth .auth-card form { margin: 0; }
+body.auth .field { margin-bottom: 8px; }
+body.auth input { margin-top: 4px; padding: 10px 12px; }
+body.auth .primary-action {
+  width: 100%;
+  min-height: 52px;
+  font-size: 1.15rem;
+  margin-top: 4px;
+}
+body.auth .remember { margin: 10px 0 2px; }
+.auth-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 0.92rem;
+}
+.auth-foot-right { margin-left: auto; display: flex; gap: 14px; }
+.primary-action { width: 100%; min-height: 52px; font-size: 1.15rem; }

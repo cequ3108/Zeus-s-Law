@@ -3,7 +3,7 @@ const { AppError } = require('./errors');
 const { CATEGORIES, ENDOWMENTS, MAX_AMOUNT } = require('./constants');
 const { taipeiDate, weekRange } = require('./time');
 const sms = require('./sms');
-const { cleanPassword, hashPassword, verifyPassword } = require('./password');
+const { cleanPassword, hashPassword, verifyPassword, temporaryPassword } = require('./password');
 const { normalizeCity, cleanDistrict } = require('./places');
 const { TEMPLATES } = require('./templates');
 const { meetingShareText, lineShareUrl } = require('./share');
@@ -241,6 +241,31 @@ function createServices(db, options = {}) {
       role: 'user',
       passwordHash: hashPassword(password),
     });
+  }
+
+  async function requestPasswordReset(rawMobile) {
+    const mobile = normalizeMobile(rawMobile);
+    if (!findByMobile(mobile)) throw new AppError('這個手機號碼還沒有註冊。');
+    return requestOtp(mobile);
+  }
+
+  function resetPassword(rawMobile, rawPassword, rawConfirm) {
+    const mobile = normalizeMobile(rawMobile);
+    const user = findByMobile(mobile);
+    if (!user) throw new AppError('這個手機號碼還沒有註冊。');
+    const password = cleanPassword(rawPassword);
+    if (password !== String(rawConfirm ?? '')) throw new AppError('兩次輸入的密碼不一樣。');
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), user.id);
+    return mustUser(user.id);
+  }
+
+  function resetPasswordByFounder(actorId, rawMobile) {
+    assertFounder(actorId);
+    const user = findByMobile(normalizeMobile(rawMobile));
+    if (!user) throw new AppError('找不到這個手機號碼。');
+    const temporary = temporaryPassword();
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(temporary), user.id);
+    return { user: mustUser(user.id), temporary };
   }
 
   function loginWithPassword(rawMobile, rawPassword) {
@@ -924,6 +949,9 @@ function createServices(db, options = {}) {
     verifyOtp,
     register,
     registerWithPassword,
+    requestPasswordReset,
+    resetPassword,
+    resetPasswordByFounder,
     loginWithPassword,
     ensureFounderAccount,
     ensureFounderFromEnv,

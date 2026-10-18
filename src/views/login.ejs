@@ -1,61 +1,31 @@
 <%- include('partials/head') %>
 <%- include('partials/header') %>
 <main class="wrap narrow">
-  <h1>用手機號碼登入</h1>
-  <% if (devSms) { %>
-    <p>現在沒有接上付費簡訊。手機號碼就是帳號，自己設定密碼就能註冊與登入。開發模式的驗證碼也還在，驗證碼會直接顯示在畫面上。</p>
-  <% } else { %>
-    <p>輸入台灣手機號碼取得簡訊驗證碼。已設定密碼的帳號也可以直接用密碼登入。這裡不收集身分證或護照。</p>
-  <% } %>
-
-  <h2>密碼登入</h2>
-  <form method="post" action="/login/password">
-    <input type="hidden" name="_csrf" value="<%= csrf %>">
-    <div class="field">
-      <label for="login_mobile">手機號碼</label>
-      <input id="login_mobile" name="mobile" type="tel" inputmode="numeric" autocomplete="username" placeholder="0912345678" required>
-    </div>
-    <div class="field">
-      <label for="login_password">密碼</label>
-      <input id="login_password" name="password" type="password" autocomplete="current-password" required>
-    </div>
-    <button type="submit">登入</button>
-  </form>
-
-  <% if (devSms) { %>
-    <h2>建立帳號</h2>
-    <p>只會成為一般使用者。新帳號的功德額度與功德都是 100。創辦人與福利機構不會出現在註冊選項。</p>
-    <form method="post" action="/join">
+  <h1>登入</h1>
+  <section class="card auth-card">
+    <form method="post" action="/login/password" autocomplete="on">
       <input type="hidden" name="_csrf" value="<%= csrf %>">
       <div class="field">
-        <label for="join_mobile">手機號碼</label>
-        <input id="join_mobile" name="mobile" type="tel" inputmode="numeric" autocomplete="tel" placeholder="0912345678" required>
+        <label for="login_mobile">手機號碼</label>
+        <input id="login_mobile" name="mobile" type="tel" inputmode="numeric" autocomplete="username" placeholder="0912345678" value="<%= rememberedMobile %>" required>
       </div>
       <div class="field">
-        <label for="join_name">怎麼稱呼你</label>
-        <input id="join_name" name="display_name" maxlength="20" autocomplete="nickname" required>
+        <label for="login_password">密碼</label>
+        <input id="login_password" name="password" type="password" autocomplete="current-password" required>
       </div>
-      <div class="field">
-        <label for="join_password">密碼</label>
-        <input id="join_password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="64" required>
-        <p class="hint">8 到 64 個字。密碼只會以 scrypt 雜湊存放，不會存明文。</p>
-      </div>
-      <div class="field">
-        <label for="join_password_confirm">再輸入一次密碼</label>
-        <input id="join_password_confirm" name="password_confirm" type="password" autocomplete="new-password" minlength="8" maxlength="64" required>
-      </div>
-      <button type="submit">建立帳號</button>
+      <button class="primary-action" type="submit">登入</button>
+      <label class="check remember" for="remember">
+        <input id="remember" type="checkbox" name="remember" value="1" checked>
+        <span>記住我</span>
+      </label>
     </form>
-  <% } %>
-
-  <h2><%= devSms ? '或用畫面上的驗證碼' : '用簡訊驗證碼' %></h2>
-  <form method="post" action="/login">
-    <input type="hidden" name="_csrf" value="<%= csrf %>">
-    <div class="field">
-      <label for="mobile">手機號碼</label>
-      <input id="mobile" name="mobile" type="tel" inputmode="numeric" autocomplete="tel" placeholder="0912345678" required>
+    <div class="auth-foot">
+      <a href="/login/code">用驗證碼登入</a>
+      <span class="auth-foot-right">
+        <a href="/join">建立帳號</a>
+        <a href="/forgot">忘記密碼</a>
+      </span>
     </div>
-    <button type="submit">取得驗證碼</button>
-  </form>
+  </section>
 </main>
 <%- include('partials/footer') %>

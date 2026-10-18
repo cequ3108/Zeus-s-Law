@@ -1,0 +1,20 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap narrow">
+  <h1>忘記密碼</h1>
+  <p class="hint">送一組驗證碼到這個手機，確認後就能設定新密碼。</p>
+  <section class="card auth-card">
+    <form method="post" action="/forgot" autocomplete="on">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="forgot_mobile">手機號碼</label>
+        <input id="forgot_mobile" name="mobile" type="tel" inputmode="numeric" autocomplete="username" placeholder="0912345678" value="<%= rememberedMobile %>" required>
+      </div>
+      <button class="primary-action" type="submit">取得驗證碼</button>
+    </form>
+    <div class="auth-foot">
+      <span class="auth-foot-right"><a href="/login">返回登入</a></span>
+    </div>
+  </section>
+</main>
+<%- include('partials/footer') %>

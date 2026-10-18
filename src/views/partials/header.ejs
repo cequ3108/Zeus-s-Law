@@ -19,9 +19,14 @@
     <% } %>
   </nav>
 </header>
-<div class="cash-banner">本平台禁止現金。不准用錢買這份幫助，也不准把功德換成現金。</div>
-<% if (devSms) { %>
-  <div class="dev-banner">示範站：這是試用環境，不是正式服務。開發模式沒有送出簡訊，驗證碼會直接顯示在畫面上。請不要留下真實個資。</div>
+<% if (compactAuth) { %>
+  <div class="cash-banner">禁止現金</div>
+  <% if (devSms) { %><div class="dev-banner">示範站，驗證碼顯示在畫面上</div><% } %>
+<% } else { %>
+  <div class="cash-banner">本平台禁止現金。不准用錢買這份幫助，也不准把功德換成現金。</div>
+  <% if (devSms) { %>
+    <div class="dev-banner">示範站：這是試用環境，不是正式服務。開發模式沒有送出簡訊，驗證碼會直接顯示在畫面上。請不要留下真實個資。</div>
+  <% } %>
 <% } %>
 <% if (user && user.blocked) { %>
   <div class="blocked-banner">你的帳號已被封鎖<% if (user.block_reason) { %>（<%= user.block_reason %>）<% } %>，不能發布或接下。</div>

@@ -34,4 +34,12 @@ function verifyPassword(password, stored) {
   return crypto.timingSafeEqual(expected, actual);
 }
 
-module.exports = { cleanPassword, hashPassword, verifyPassword };
+function temporaryPassword() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  const bytes = crypto.randomBytes(12);
+  let password = '';
+  for (let i = 0; i < bytes.length; i += 1) password += alphabet[bytes[i] % alphabet.length];
+  return password;
+}
+
+module.exports = { cleanPassword, hashPassword, verifyPassword, temporaryPassword };

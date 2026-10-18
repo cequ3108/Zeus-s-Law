@@ -4,6 +4,7 @@ const express = require('express');
 const session = require('express-session');
 const { SqliteStore } = require('./sessions');
 const { AppError } = require('./errors');
+const { cleanPassword } = require('./password');
 const { createServices } = require('./services');
 const { isDevMode } = require('./sms');
 const { ROLES, KINDS, CATEGORIES, STATUSES } = require('./constants');
@@ -11,11 +12,56 @@ const { CITIES, normalizeCity } = require('./places');
 const { templatesFor, findTemplate } = require('./templates');
 const { formatMerit, formatTaipei } = require('./time');
 
+const REMEMBER_MS = 30 * 24 * 60 * 60 * 1000;
+const MOBILE_COOKIE = 'zeus.mobile';
+const COMPACT_PATHS = new Set([
+  '/login', '/login/code', '/join', '/forgot', '/forgot/reset', '/verify', '/register',
+]);
+
 function safeReturn(url) {
   if (typeof url === 'string' && url.startsWith('/') && !url.startsWith('//') && !url.includes('\\')) {
     return url;
   }
   return '';
+}
+
+function readCookie(req, name) {
+  const header = req.headers.cookie;
+  if (!header) return '';
+  for (const part of header.split(';')) {
+    const trimmed = part.trim();
+    const index = trimmed.indexOf('=');
+    if (index === -1 || trimmed.slice(0, index) !== name) continue;
+    try {
+      return decodeURIComponent(trimmed.slice(index + 1));
+    } catch {
+      return '';
+    }
+  }
+  return '';
+}
+
+function typedMobile(raw) {
+  const mobile = String(raw ?? '').replace(/[\s-]/g, '');
+  return /^09\d{8}$/.test(mobile) ? mobile : '';
+}
+
+function applyRemember(req, remember) {
+  req.session.cookie.maxAge = remember ? REMEMBER_MS : null;
+}
+
+function rememberPhone(req, res, mobile, remember) {
+  const options = {
+    path: '/',
+    sameSite: 'lax',
+    secure: req.session.cookie.secure === true,
+    httpOnly: true,
+  };
+  if (remember && /^09\d{8}$/.test(mobile)) {
+    res.cookie(MOBILE_COOKIE, mobile, { ...options, maxAge: REMEMBER_MS });
+    return;
+  }
+  res.clearCookie(MOBILE_COOKIE, options);
 }
 
 function settlementFlash(result) {
@@ -99,6 +145,9 @@ function createApp(options = {}) {
     res.locals.flash = req.session.flash || null;
     delete req.session.flash;
     res.locals.devSms = isDevMode();
+    res.locals.compactAuth = COMPACT_PATHS.has(req.path);
+    const remembered = readCookie(req, MOBILE_COOKIE);
+    res.locals.rememberedMobile = /^09\d{8}$/.test(remembered) ? remembered : '';
     res.locals.currentPath = req.path;
     res.locals.user = null;
     if (req.session.userId) {
@@ -129,18 +178,48 @@ function createApp(options = {}) {
     if (req.path.startsWith('/admin')) return '/admin';
     if (req.path.startsWith('/org')) return '/org/apply';
     if (req.path === '/posts' || req.path === '/posts/new') return '/posts/new';
+    if (req.path === '/forgot' || req.path === '/forgot/reset') return '/forgot';
+    if (req.path === '/login/code' || req.path === '/verify') return '/login/code';
+    if (req.path === '/join' || req.path === '/register') return '/join';
     return '/login';
   }
 
   function rejectStaleForm(req, res) {
     const message = '表單已更新，請再送出一次。';
-    if (req.path === '/login' || req.path === '/login/password' || req.path === '/join') {
+    const again = () => {
       res.locals.flash = { type: 'err', message };
+    };
+    if (req.path === '/login' || req.path === '/login/password') {
+      again();
       res.status(403).render('login', { title: '登入' });
       return;
     }
-    if (req.path === '/verify' && req.session.otpMobile) {
-      res.locals.flash = { type: 'err', message };
+    if (req.path === '/join') {
+      again();
+      res.status(403).render('join', { title: '建立帳號' });
+      return;
+    }
+    if (req.path === '/login/code') {
+      again();
+      res.status(403).render('login-code', { title: '用驗證碼登入' });
+      return;
+    }
+    if (req.path === '/forgot') {
+      again();
+      res.status(403).render('forgot', { title: '忘記密碼' });
+      return;
+    }
+    if (req.path === '/forgot/reset' && req.session.otpMobile && req.session.otpPurpose === 'reset') {
+      again();
+      res.status(403).render('forgot-reset', {
+        title: '設定新密碼',
+        mobile: req.session.otpMobile,
+        devCode: req.session.devCode || null,
+      });
+      return;
+    }
+    if (req.path === '/verify' && req.session.otpMobile && req.session.otpPurpose !== 'reset') {
+      again();
       res.status(403).render('verify', {
         title: '驗證碼',
         mobile: req.session.otpMobile,
@@ -149,7 +228,7 @@ function createApp(options = {}) {
       return;
     }
     if (req.path === '/register' && req.session.verifiedMobile) {
-      res.locals.flash = { type: 'err', message };
+      again();
       res.status(403).render('register', { title: '建立帳號', mobile: req.session.verifiedMobile });
       return;
     }
@@ -250,20 +329,42 @@ function createApp(options = {}) {
   });
 
   app.post('/login/password', requireCsrf, (req, res) => {
+    const remember = req.body.remember === '1';
+    let user;
     try {
-      const user = services.loginWithPassword(req.body.mobile, req.body.password);
-      req.session.userId = user.id;
-      const dest = safeReturn(req.session.returnTo) || '/me';
-      delete req.session.returnTo;
-      redirectWith(req, res, dest, { type: 'ok', message: '已登入。' });
+      user = services.loginWithPassword(req.body.mobile, req.body.password);
     } catch (err) {
+      const typed = typedMobile(req.body.mobile);
+      if (!remember) rememberPhone(req, res, '', false);
+      else if (typed) rememberPhone(req, res, typed, true);
       handle(err, req, res, '/login');
+      return;
     }
+    const dest = safeReturn(req.session.returnTo) || '/me';
+    req.session.regenerate((err) => {
+      if (err) {
+        console.error(err);
+        res.status(500).render('error', { title: '錯誤', message: '系統發生錯誤，請再試一次。' });
+        return;
+      }
+      applyRemember(req, remember);
+      rememberPhone(req, res, user.mobile, remember);
+      req.session.userId = user.id;
+      redirectWith(req, res, dest, { type: 'ok', message: '已登入。' });
+    });
+  });
+
+  app.get('/join', (req, res) => {
+    if (res.locals.user) {
+      res.redirect('/me');
+      return;
+    }
+    res.render('join', { title: '建立帳號' });
   });
 
   app.post('/join', requireCsrf, (req, res) => {
     if (!isDevMode()) {
-      redirectWith(req, res, '/login', { type: 'err', message: '已接上簡訊時，請用驗證碼建立帳號。' });
+      redirectWith(req, res, '/join', { type: 'err', message: '已接上簡訊時，請用驗證碼建立帳號。' });
       return;
     }
     try {
@@ -273,6 +374,7 @@ function createApp(options = {}) {
         req.body.password,
         req.body.password_confirm,
       );
+      rememberPhone(req, res, user.mobile, true);
       req.session.userId = user.id;
       const dest = safeReturn(req.session.returnTo) || '/me';
       delete req.session.returnTo;
@@ -281,7 +383,66 @@ function createApp(options = {}) {
         message: '帳號已建立。功德額度 100，功德 100。之後用手機號碼與密碼登入。',
       });
     } catch (err) {
-      handle(err, req, res, '/login');
+      handle(err, req, res, '/join');
+    }
+  });
+
+  app.get('/login/code', (req, res) => {
+    if (res.locals.user) {
+      res.redirect('/me');
+      return;
+    }
+    res.render('login-code', { title: '用驗證碼登入' });
+  });
+
+  app.get('/forgot', (req, res) => {
+    res.render('forgot', { title: '忘記密碼' });
+  });
+
+  app.post('/forgot', requireCsrf, asyncRoute(async (req, res) => {
+    try {
+      const result = await services.requestPasswordReset(req.body.mobile);
+      req.session.otpMobile = result.mobile;
+      req.session.devCode = result.devCode;
+      req.session.otpPurpose = 'reset';
+      res.redirect('/forgot/reset');
+    } catch (err) {
+      handle(err, req, res, '/forgot');
+    }
+  }));
+
+  app.get('/forgot/reset', (req, res) => {
+    if (!req.session.otpMobile || req.session.otpPurpose !== 'reset') {
+      res.redirect('/forgot');
+      return;
+    }
+    res.render('forgot-reset', {
+      title: '設定新密碼',
+      mobile: req.session.otpMobile,
+      devCode: req.session.devCode || null,
+    });
+  });
+
+  app.post('/forgot/reset', requireCsrf, (req, res) => {
+    const mobile = req.session.otpMobile;
+    if (!mobile || req.session.otpPurpose !== 'reset') {
+      res.redirect('/forgot');
+      return;
+    }
+    try {
+      const password = cleanPassword(req.body.password);
+      if (password !== String(req.body.password_confirm ?? '')) throw new AppError('兩次輸入的密碼不一樣。');
+      services.verifyOtp(mobile, req.body.code);
+      const user = services.resetPassword(mobile, password, password);
+      delete req.session.devCode;
+      delete req.session.otpMobile;
+      delete req.session.otpPurpose;
+      applyRemember(req, true);
+      rememberPhone(req, res, user.mobile, true);
+      req.session.userId = user.id;
+      redirectWith(req, res, '/account', { type: 'ok', message: '密碼已更新。' });
+    } catch (err) {
+      handle(err, req, res, '/forgot/reset');
     }
   });
 
@@ -290,15 +451,20 @@ function createApp(options = {}) {
       const result = await services.requestOtp(req.body.mobile);
       req.session.otpMobile = result.mobile;
       req.session.devCode = result.devCode;
+      req.session.otpPurpose = 'login';
       res.redirect('/verify');
     } catch (err) {
-      handle(err, req, res, '/login');
+      handle(err, req, res, '/login/code');
     }
   }));
 
   app.get('/verify', (req, res) => {
+    if (req.session.otpPurpose === 'reset') {
+      res.redirect('/forgot/reset');
+      return;
+    }
     if (!req.session.otpMobile) {
-      res.redirect('/login');
+      res.redirect('/login/code');
       return;
     }
     res.render('verify', {
@@ -309,15 +475,20 @@ function createApp(options = {}) {
   });
 
   app.post('/verify', requireCsrf, (req, res) => {
+    if (req.session.otpPurpose === 'reset') {
+      res.redirect('/forgot/reset');
+      return;
+    }
     const mobile = req.session.otpMobile;
     if (!mobile) {
-      res.redirect('/login');
+      res.redirect('/login/code');
       return;
     }
     try {
       const result = services.verifyOtp(mobile, req.body.code);
       delete req.session.devCode;
       delete req.session.otpMobile;
+      delete req.session.otpPurpose;
       if (result.user) {
         req.session.userId = result.user.id;
         const dest = safeReturn(req.session.returnTo) || '/me';
@@ -338,7 +509,7 @@ function createApp(options = {}) {
       return;
     }
     if (!req.session.verifiedMobile) {
-      res.redirect('/login');
+      res.redirect('/login/code');
       return;
     }
     res.render('register', { title: '建立帳號', mobile: req.session.verifiedMobile });
@@ -347,7 +518,7 @@ function createApp(options = {}) {
   app.post('/register', requireCsrf, (req, res) => {
     const mobile = req.session.verifiedMobile;
     if (!mobile) {
-      res.redirect('/login');
+      res.redirect('/login/code');
       return;
     }
     try {
@@ -530,12 +701,32 @@ function createApp(options = {}) {
     }
   });
 
-  app.get('/admin', requireFounder, (req, res) => {
+  function renderAdmin(req, res, extra = {}) {
+    const queryMobile = extra.queryMobile || String(req.query.mobile || '');
     res.render('admin', {
       title: '管理',
-      data: services.adminSnapshot(res.locals.user.id, String(req.query.mobile || '').trim()),
-      queryMobile: String(req.query.mobile || ''),
+      data: services.adminSnapshot(res.locals.user.id, queryMobile.trim()),
+      queryMobile,
+      temporaryPassword: extra.temporaryPassword || null,
+      resetName: extra.resetName || '',
     });
+  }
+
+  app.get('/admin', requireFounder, (req, res) => {
+    renderAdmin(req, res);
+  });
+
+  app.post('/admin/password', requireCsrf, requireFounder, (req, res) => {
+    try {
+      const result = services.resetPasswordByFounder(res.locals.user.id, req.body.mobile);
+      renderAdmin(req, res, {
+        queryMobile: result.user.mobile,
+        temporaryPassword: result.temporary,
+        resetName: result.user.display_name,
+      });
+    } catch (err) {
+      handle(err, req, res, '/admin');
+    }
   });
 
   app.post('/admin/orgs', requireCsrf, requireFounder, (req, res) => {

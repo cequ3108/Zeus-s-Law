@@ -64,6 +64,23 @@
   </section>
 
   <section class="card">
+    <h2>重設密碼</h2>
+    <p class="hint">產生一組暫時密碼，只在這個畫面出現一次。資料庫只存雜湊，請私下告訴對方。</p>
+    <form method="post" action="/admin/password">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="reset_mobile">手機號碼</label>
+        <input id="reset_mobile" name="mobile" required placeholder="0912345678" value="<%= queryMobile %>">
+      </div>
+      <button type="submit">重設為暫時密碼</button>
+    </form>
+    <% if (temporaryPassword) { %>
+      <p class="flash flash-ok">已重設 <%= resetName %> 的密碼。暫時密碼：<strong id="temporary-password"><%= temporaryPassword %></strong></p>
+      <p class="hint">離開這個頁面就看不到了。餘額沒有變動。</p>
+    <% } %>
+  </section>
+
+  <section class="card">
     <h2>封鎖收取現金的帳號</h2>
     <form method="post" action="/admin/block">
       <input type="hidden" name="_csrf" value="<%= csrf %>">
