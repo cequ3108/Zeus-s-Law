@@ -123,13 +123,13 @@ SESSION_SECRET=一長串隨機文字
 DATA_DIR=/你的持久磁碟/zeus-data
 ```
 
-`DB_PATH` 若有設定，會蓋過 `DATA_DIR`。`NODE_ENV=production` 時，登入 cookie 只在 HTTPS 傳送。
+`DB_PATH` 若有設定，會蓋過 `DATA_DIR`。登入狀態存在同一個 SQLite 檔的 `sessions` 表，重啟或主機休眠後不會被清掉。程式信任前面一層反向代理：請求帶 `X-Forwarded-Proto: https` 時，cookie 會加上 Secure。直接開 `http://localhost:3000` 時不加 Secure，本機仍可登入。
 
 ## 放到有持久磁碟的免費 Node 主機
 
 程式以 `npm start` 啟動，聽 `PORT`（沒有設定時是 3000）。資料庫是單一 SQLite 檔，預設寫在 `DATA_DIR/zeus.db`。主機必須有持久磁碟；沒有磁碟的免費方案在休眠或重新部署後會把帳號與功德清掉。
 
-建議用 [Bonto](https://bonto.dev/register)。用 GitHub 登入後，拉取這個公開倉庫的分支，Node 22，啟動指令 `npm start`。不要設定 `SMS_PROVIDER`。把資料目錄指到主機不會清掉的磁碟。
+建議用 [Bonto](https://bonto.dev/register)。用 GitHub 登入後，拉取這個公開倉庫的分支，Node 22，啟動指令 `npm start`。若用 nodemon，專案裡的 `nodemon.json` 會忽略 `data/` 與 `backups/`，資料庫寫入不會把程序重啟。不要設定 `SMS_PROVIDER`。把資料目錄指到主機不會清掉的磁碟。
 
 要設定的環境變數：
 
@@ -141,7 +141,7 @@ DATA_DIR=/你的持久磁碟/zeus-data
 | `DB_PATH` | 不必 | 直接指定資料庫檔。有設的話會蓋過 `DATA_DIR` |
 | `FOUNDER_PHONE` | 要 | 創辦人手機，09 開頭共 10 碼 |
 | `FOUNDER_PASSWORD` | 要 | 創辦人密碼，8 到 64 個字。只會存 scrypt 雜湊 |
-| `NODE_ENV` | 有 HTTPS 再設 | 設成 `production` 時 cookie 才加 Secure |
+| `NODE_ENV` | 選填 | 不決定 cookie。HTTPS 由代理的 `X-Forwarded-Proto` 判斷 |
 | `SMS_PROVIDER` | 先不要設 | 不設就能用手機加密碼註冊。設 `every8d` 才會送簡訊 |
 | `EVERY8D_UID` | 接簡訊才要 | EVERY8D 帳號 |
 | `EVERY8D_PWD` | 接簡訊才要 | EVERY8D 密碼 |

@@ -109,6 +109,14 @@ CREATE TABLE IF NOT EXISTS ledger (
 
 CREATE INDEX IF NOT EXISTS idx_ledger_user ON ledger (user_id, id);
 
+CREATE TABLE IF NOT EXISTS sessions (
+  sid TEXT PRIMARY KEY,
+  sess TEXT NOT NULL,
+  expire INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_expire ON sessions (expire);
+
 CREATE TRIGGER IF NOT EXISTS ledger_no_update
 BEFORE UPDATE ON ledger
 BEGIN

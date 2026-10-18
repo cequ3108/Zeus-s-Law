@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
+const { SqliteStore } = require('./sessions');
 const { AppError } = require('./errors');
 const { createServices } = require('./services');
 const { isDevMode } = require('./sms');
@@ -44,6 +45,7 @@ function createApp(options = {}) {
   const services = createServices(options.db, { now: options.now });
   const app = express();
   app.disable('x-powered-by');
+  app.set('trust proxy', options.trustProxy ?? 1);
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, 'views'));
   app.locals.formatMerit = formatMerit;
@@ -74,10 +76,12 @@ function createApp(options = {}) {
     secret: options.sessionSecret || process.env.SESSION_SECRET || 'zeus-dev-session',
     resave: false,
     saveUninitialized: false,
+    proxy: true,
+    store: options.sessionStore || new SqliteStore(options.db),
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
-      secure: options.cookieSecure ?? process.env.NODE_ENV === 'production',
+      secure: options.cookieSecure ?? 'auto',
       maxAge: 30 * 24 * 60 * 60 * 1000,
     },
   }));
@@ -111,9 +115,56 @@ function createApp(options = {}) {
     return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
   }
 
+  function formReturn(req) {
+    const referer = req.get('referer') || '';
+    try {
+      const url = new URL(referer, 'http://localhost');
+      if (safeReturn(url.pathname)) return url.pathname + url.search;
+    } catch {
+      // 來源不是網址時，改回這個動作對應的頁面。
+    }
+    const post = String(req.path || '').match(/^\/posts\/(\d+)/);
+    if (post) return `/posts/${post[1]}`;
+    if (req.path === '/account' || req.path.startsWith('/account/')) return '/account';
+    if (req.path.startsWith('/admin')) return '/admin';
+    if (req.path.startsWith('/org')) return '/org/apply';
+    if (req.path === '/posts' || req.path === '/posts/new') return '/posts/new';
+    return '/login';
+  }
+
+  function rejectStaleForm(req, res) {
+    const message = '表單已更新，請再送出一次。';
+    if (req.path === '/login' || req.path === '/login/password' || req.path === '/join') {
+      res.locals.flash = { type: 'err', message };
+      res.status(403).render('login', { title: '登入' });
+      return;
+    }
+    if (req.path === '/verify' && req.session.otpMobile) {
+      res.locals.flash = { type: 'err', message };
+      res.status(403).render('verify', {
+        title: '驗證碼',
+        mobile: req.session.otpMobile,
+        devCode: req.session.devCode || null,
+      });
+      return;
+    }
+    if (req.path === '/register' && req.session.verifiedMobile) {
+      res.locals.flash = { type: 'err', message };
+      res.status(403).render('register', { title: '建立帳號', mobile: req.session.verifiedMobile });
+      return;
+    }
+    req.session.flash = { type: 'err', message };
+    res.redirect(303, formReturn(req));
+  }
+
   function requireCsrf(req, res, next) {
+    if (!req.session) {
+      rejectStaleForm(req, res);
+      return;
+    }
+    if (!req.session.csrf) req.session.csrf = crypto.randomBytes(16).toString('hex');
     if (!req.body || req.body._csrf !== req.session.csrf) {
-      res.status(403).render('error', { title: '表單過期', message: '表單已過期，請回上一頁重新送出。' });
+      rejectStaleForm(req, res);
       return;
     }
     next();
