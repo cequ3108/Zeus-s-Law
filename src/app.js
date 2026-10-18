@@ -3,6 +3,7 @@ const path = require('path');
 const express = require('express');
 const session = require('express-session');
 const { SqliteStore } = require('./sessions');
+const { asset, publicDir } = require('./assets');
 const { AppError } = require('./errors');
 const { cleanPassword } = require('./password');
 const { createServices } = require('./services');
@@ -114,9 +115,13 @@ function createApp(options = {}) {
     const full = Math.max(0, Math.min(5, Math.round(Number(value))));
     return '★'.repeat(full) + '☆'.repeat(5 - full);
   };
+  app.locals.asset = asset;
 
   app.use(express.urlencoded({ extended: false, limit: '32kb' }));
-  app.use(express.static(path.join(__dirname, '..', 'public')));
+  app.use(express.static(publicDir, {
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+    immutable: true,
+  }));
   app.use(session({
     name: 'zeus.sid',
     secret: options.sessionSecret || process.env.SESSION_SECRET || 'zeus-dev-session',
