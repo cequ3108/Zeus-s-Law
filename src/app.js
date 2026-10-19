@@ -9,6 +9,7 @@ const { cleanPassword } = require('./password');
 const { createServices } = require('./services');
 const { isDevMode } = require('./sms');
 const { ROLES, KINDS, CATEGORIES, STATUSES, RATING_TAGS } = require('./constants');
+const { RULES_HIGHLIGHTS, RULES_PAGE } = require('./rules-copy');
 const { CITIES, normalizeCity } = require('./places');
 const { templatesFor, findTemplate } = require('./templates');
 const { formatMerit, formatTaipei } = require('./time');
@@ -102,6 +103,8 @@ function createApp(options = {}) {
   app.locals.categoryLabel = (category) => CATEGORIES[category] || category;
   app.locals.statusLabel = (status) => STATUSES[status] || status;
   app.locals.ratingTags = RATING_TAGS;
+  app.locals.rulesHighlights = RULES_HIGHLIGHTS;
+  app.locals.rulesPage = RULES_PAGE;
   app.locals.ledgerReason = (reason) => ({
     signup: '註冊',
     founder_seed: '建立創辦人',
@@ -158,7 +161,8 @@ function createApp(options = {}) {
     res.locals.user = null;
     if (req.session.userId) {
       res.locals.user = options.db.prepare(`
-        SELECT id, mobile, display_name, role, merit, quota, blocked, block_reason, city, district, availability
+        SELECT id, mobile, display_name, role, merit, quota, blocked, block_reason, city, district, availability,
+               rules_acknowledged_at
         FROM users WHERE id = ?
       `).get(req.session.userId) || null;
       if (!res.locals.user) delete req.session.userId;
@@ -196,6 +200,7 @@ function createApp(options = {}) {
     }
     if (req.path.startsWith('/org')) return '/org/apply';
     if (req.path === '/posts' || req.path === '/posts/new') return '/posts/new';
+    if (req.path === '/rules/ack') return safeReturn(req.body && req.body.return) || '/me';
     if (req.path === '/forgot' || req.path === '/forgot/reset') return '/forgot';
     if (req.path === '/login/code' || req.path === '/verify') return '/login/code';
     if (req.path === '/join' || req.path === '/register') return '/join';
@@ -339,7 +344,12 @@ function createApp(options = {}) {
   });
 
   app.get('/rules', (req, res) => {
-    res.render('rules', { title: '規範' });
+    res.render('rules', { title: RULES_PAGE.title });
+  });
+
+  app.post('/rules/ack', requireCsrf, requireLogin, (req, res) => {
+    services.acknowledgeRules(res.locals.user.id);
+    res.redirect(safeReturn(req.body.return) || '/me');
   });
 
   app.get('/login', (req, res) => {

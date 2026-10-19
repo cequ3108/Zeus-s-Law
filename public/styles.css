@@ -32,7 +32,7 @@ a:hover { color: var(--seal); }
 .wrap { width: min(760px, calc(100% - 32px)); margin: 0 auto; }
 .narrow { max-width: 560px; }
 
-input, button, select, textarea, nav, .ui, .hint, .meta, .cash-banner, .dev-banner, .blocked-banner, .announcement, .draft-note {
+input, button, select, textarea, nav, .ui, .hint, .meta, .cash-banner, .dev-banner, .blocked-banner, .announcement, .draft-note, .rules-gate {
   font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
 }
 
@@ -117,6 +117,29 @@ main { padding-top: 8px; }
 .hero { margin-bottom: 18px; }
 .prose ul { padding-left: 1.2em; }
 .prose li { margin: 0.35em 0; }
+.rules-page section { margin: 20px 0; }
+.rules-page h2 { font-size: 1.25rem; margin-bottom: 0.3em; }
+.rules-gate {
+  position: fixed;
+  z-index: 30;
+  left: 16px;
+  right: 16px;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  max-height: calc(100vh - 140px);
+  overflow: auto;
+  background: var(--card);
+  border: 1px solid var(--ink);
+  border-radius: 16px;
+  padding: 14px 16px 16px;
+  box-shadow: 0 10px 28px rgba(36, 28, 21, 0.18);
+}
+.rules-gate h2 { margin: 0 0 8px; font-size: 1.2rem; }
+.rules-gate ul { margin: 0; padding-left: 1.2em; }
+.rules-gate li { margin: 0.3em 0; }
+.rules-gate p { margin: 4px 0 0; }
+.rules-gate a { display: inline-flex; align-items: center; min-height: 44px; }
+.rules-gate form { margin: 4px 0 0; }
+.rules-gate button { width: 100%; min-height: 44px; }
 
 .card {
   background: var(--card);

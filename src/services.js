@@ -99,6 +99,16 @@ function createServices(db, options = {}) {
     return crypto.createHash('sha256').update(`${pepper}:${mobile}:${code}`).digest('hex');
   }
 
+  function acknowledgeRules(userId) {
+    const user = mustUser(userId);
+    if (!user.rules_acknowledged_at) {
+      db.prepare(`
+        UPDATE users SET rules_acknowledged_at = ? WHERE id = ? AND rules_acknowledged_at IS NULL
+      `).run(clock().toISOString(), user.id);
+    }
+    return mustUser(user.id);
+  }
+
   function mustUser(id) {
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
     if (!user) throw new AppError('找不到使用者。');
@@ -1310,6 +1320,7 @@ function createServices(db, options = {}) {
     postPage,
     toggleBookmark,
     listBookmarks,
+    acknowledgeRules,
     adminSnapshot,
     findByMobile,
   };

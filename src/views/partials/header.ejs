@@ -7,7 +7,7 @@
     <p class="seal">禁現金</p>
   </div>
   <nav class="wrap">
-    <a href="/rules">規範</a>
+    <a href="/rules">規則</a>
     <% if (user) { %>
       <% if (user.role === 'founder') { %><a href="/admin">管理</a><% } %>
       <form class="nav-form" method="post" action="/logout">
@@ -34,5 +34,21 @@
 <% if (flash) { %>
   <div class="wrap">
     <p class="flash flash-<%= flash.type %>"><%= flash.message %></p>
+  </div>
+<% } %>
+<% if (user && !user.rules_acknowledged_at) { %>
+  <div class="rules-gate" data-rules-gate role="dialog" aria-labelledby="rules-gate-title">
+    <h2 id="rules-gate-title">先看三件事</h2>
+    <ul>
+      <% rulesHighlights.forEach(function (item) { %>
+        <li><strong><%= item.title %></strong> <%= item.body %></li>
+      <% }) %>
+    </ul>
+    <p><a href="/rules">看完整規則</a></p>
+    <form method="post" action="/rules/ack">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="return" value="<%= currentPath %>">
+      <button type="submit">我了解</button>
+    </form>
   </div>
 <% } %>
