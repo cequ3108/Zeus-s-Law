@@ -4,6 +4,73 @@
   <h1>管理</h1>
   <p>創辦人可以建立福利機構、審核申請，以及封鎖收取現金的帳號。創辦人本身不是從這個頁面註冊出來的。</p>
 
+  <section aria-label="社群概況">
+    <h2>社群概況</h2>
+    <div class="stat-grid">
+      <article class="card stat">
+        <strong data-stat="users"><%= formatMerit(data.stats.users) %></strong>
+        <span>一般會員</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="orgs"><%= formatMerit(data.stats.orgs) %></strong>
+        <span>福利機構</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="signups"><%= formatMerit(data.stats.signups) %></strong>
+        <span>七日內新加入</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="open-posts"><%= formatMerit(data.stats.openPosts) %></strong>
+        <span>招募中</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="new-posts"><%= formatMerit(data.stats.newPosts) %></strong>
+        <span>七日內新貼文</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="settled-week"><%= formatMerit(data.stats.settledWeek) %></strong>
+        <span>七日內完成</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="settled-all"><%= formatMerit(data.stats.settledAll) %></strong>
+        <span>累計完成</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="merit-members"><%= formatMerit(data.stats.meritMembers) %></strong>
+        <span>七日內會員流動</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="merit-founder"><%= formatMerit(data.stats.meritFounder) %></strong>
+        <span>七日內創辦人發出</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="rating-avg"><%= data.stats.ratingAvg %></strong>
+        <span>平均星等</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="rating-count"><%= formatMerit(data.stats.ratingCount) %></strong>
+        <span>評分則數</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="banned"><%= formatMerit(data.stats.banned) %></strong>
+        <span>封鎖帳號</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="pending-orgs"><%= formatMerit(data.stats.pendingOrgs) %></strong>
+        <span>待審機構</span>
+      </article>
+    </div>
+    <h3>招募中的縣市</h3>
+    <% if (!data.stats.cities.length) { %>
+      <p class="empty" data-cities="0">0</p>
+    <% } %>
+    <ol class="city-rank">
+      <% data.stats.cities.forEach(function (city) { %>
+        <li data-city="<%= city.city %>" data-count="<%= city.count %>"><%= city.city %> · <%= city.count %></li>
+      <% }) %>
+    </ol>
+  </section>
+
   <section class="card">
     <h2>站內公告</h2>
     <p class="hint">顯示在廣場最上方，一次只有最新一則。標題可不填。內文 1 到 40 個字，大約一兩行。時效沒填就是 72 小時。撤下或到期後就不再顯示。</p>

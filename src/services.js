@@ -1268,6 +1268,83 @@ function createServices(db, options = {}) {
     });
   }
 
+  // 含剛好 7 天前的那一刻，更早的不算。只讀，不寫入。
+  function readCommunityStats() {
+    const nowIso = clock().toISOString();
+    const since = new Date(clock().getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const members = db.prepare(`
+      SELECT
+        COALESCE(SUM(role = 'user'), 0) AS users,
+        COALESCE(SUM(role = 'org'), 0) AS orgs,
+        COALESCE(SUM(role IN ('user', 'org') AND created_at >= ?), 0) AS signups
+      FROM users
+    `).get(since);
+    const openPosts = db.prepare(`
+      SELECT COUNT(*) AS n FROM posts
+      WHERE status = 'open' AND (expires_at IS NULL OR expires_at > ?)
+    `).get(nowIso).n;
+    const newPosts = db.prepare(`
+      SELECT COUNT(*) AS n FROM posts WHERE created_at >= ?
+    `).get(since).n;
+    const settledAll = db.prepare(`
+      SELECT COUNT(*) AS n FROM posts WHERE status = 'settled'
+    `).get().n;
+    const settledWeek = db.prepare(`
+      SELECT COUNT(*) AS n FROM posts WHERE status = 'settled' AND settled_at >= ?
+    `).get(since).n;
+    const meritMembers = db.prepare(`
+      SELECT COALESCE(SUM(l.delta_merit), 0) AS n
+      FROM ledger l
+      JOIN users payer ON payer.id = l.counterparty_id
+      JOIN users receiver ON receiver.id = l.user_id
+      WHERE l.reason = 'settle_receive' AND l.created_at >= ?
+        AND payer.role != 'founder' AND receiver.role != 'founder'
+    `).get(since).n;
+    const meritFounder = db.prepare(`
+      SELECT COALESCE(SUM(l.delta_merit), 0) AS n
+      FROM ledger l
+      JOIN users payer ON payer.id = l.counterparty_id
+      WHERE l.reason = 'settle_receive' AND l.created_at >= ? AND payer.role = 'founder'
+    `).get(since).n;
+    const ratings = db.prepare(`
+      SELECT COUNT(*) AS n, AVG(stars) AS avg FROM ratings
+    `).get();
+    const cities = db.prepare(`
+      SELECT city, COUNT(*) AS count
+      FROM posts
+      WHERE status = 'open' AND city IS NOT NULL AND city != ''
+        AND (expires_at IS NULL OR expires_at > ?)
+      GROUP BY city
+      ORDER BY count DESC, city ASC
+      LIMIT 5
+    `).all(nowIso);
+    const banned = db.prepare(`SELECT COUNT(*) AS n FROM users WHERE blocked = 1`).get().n;
+    const pendingOrgs = db.prepare(`
+      SELECT COUNT(*) AS n FROM org_applications WHERE status = 'pending'
+    `).get().n;
+    return {
+      users: members.users,
+      orgs: members.orgs,
+      signups: members.signups,
+      openPosts,
+      newPosts,
+      settledWeek,
+      settledAll,
+      meritMembers,
+      meritFounder,
+      ratingAvg: ratings.n ? Math.round(ratings.avg * 10) / 10 : 0,
+      ratingCount: ratings.n,
+      cities,
+      banned,
+      pendingOrgs,
+    };
+  }
+
+  function communityStats(actorId) {
+    assertFounder(actorId);
+    return readCommunityStats();
+  }
+
   function adminSnapshot(actorId, lookupMobile) {
     assertFounder(actorId);
     const applications = db.prepare(`
@@ -1311,7 +1388,14 @@ function createServices(db, options = {}) {
       ORDER BY l.id DESC
       LIMIT 30
     `).all();
-    return { applications, blocked, lookup, ledger, announcements: listAnnouncements() };
+    return {
+      applications,
+      blocked,
+      lookup,
+      ledger,
+      announcements: listAnnouncements(),
+      stats: readCommunityStats(),
+    };
   }
 
   return {
@@ -1365,6 +1449,7 @@ function createServices(db, options = {}) {
     listBookmarks,
     acknowledgeRules,
     adminSnapshot,
+    communityStats,
     findByMobile,
   };
 }

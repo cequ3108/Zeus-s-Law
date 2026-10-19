@@ -180,6 +180,27 @@ button.bookmark.saved svg path { fill: currentColor; }
 .card.is-closed h3 a,
 .card.is-closed .meta,
 .card.is-closed .excerpt { color: var(--muted); }
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.stat-grid .card { margin: 0; padding: 12px; }
+.stat strong {
+  display: block;
+  font-size: 1.7rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+.stat span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.city-rank { margin: 8px 0 0; padding-left: 1.2em; }
+.city-rank li { margin: 0.2em 0; }
 .balances { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .balance strong {
   display: block;
