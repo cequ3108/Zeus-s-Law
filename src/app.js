@@ -164,6 +164,12 @@ function createApp(options = {}) {
       if (!res.locals.user) delete req.session.userId;
     }
     res.locals.actionCount = res.locals.user ? services.pendingActions(res.locals.user.id) : 0;
+    res.locals.clearDraft = '';
+    if (req.method === 'GET' && req.session.clearDraft) {
+      const flag = String(req.session.clearDraft);
+      if (/^[0-9]+$/.test(flag)) res.locals.clearDraft = flag;
+      delete req.session.clearDraft;
+    }
     next();
   });
 
@@ -304,6 +310,7 @@ function createApp(options = {}) {
   });
 
   app.get('/', (req, res) => {
+    if (req.query['clear-draft'] === '1') res.locals.clearDraft = 'all';
     const rawCity = String(req.query.city || '').trim();
     let city = rawCity;
     if (!rawCity && res.locals.user && res.locals.user.city) city = res.locals.user.city;
@@ -554,7 +561,7 @@ function createApp(options = {}) {
   });
 
   app.post('/logout', requireCsrf, (req, res) => {
-    req.session.destroy(() => res.redirect('/'));
+    req.session.destroy(() => res.redirect('/?clear-draft=1'));
   });
 
   app.get('/me', requireLogin, (req, res) => {
@@ -597,6 +604,7 @@ function createApp(options = {}) {
   app.post('/posts', requireCsrf, requireLogin, (req, res) => {
     try {
       const post = services.createPost(res.locals.user.id, req.body);
+      req.session.clearDraft = String(res.locals.user.id);
       redirectWith(req, res, `/posts/${post.id}`, { type: 'ok', message: '已發布。' });
     } catch (err) {
       handle(err, req, res, '/posts/new');

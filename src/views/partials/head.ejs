@@ -8,4 +8,4 @@
   <link rel="icon" href="<%= asset('/favicon.svg') %>" type="image/svg+xml">
   <link rel="stylesheet" href="<%= asset('/styles.css') %>">
 </head>
-<body class="<%= compactAuth ? 'auth' : '' %>">
+<body class="<%= compactAuth ? 'auth' : '' %>"<% if (typeof clearDraft !== 'undefined' && (clearDraft === 'all' || /^[0-9]+$/.test(String(clearDraft)))) { %> data-clear-draft="<%= clearDraft %>"<% } %>>

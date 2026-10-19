@@ -9,5 +9,8 @@
   <a class="<%= currentPath === '/me' ? 'active' : '' %>" href="<%= user ? '/me' : '/login?next=/me' %>">我的交易<% if (user && actionCount) { %> (<%= actionCount %>)<% } %></a>
   <a class="<%= currentPath === '/account' ? 'active' : '' %>" href="<%= user ? '/account' : '/login?next=/account' %>">我的帳號</a>
 </nav>
+<% if ((typeof clearDraft !== 'undefined' && clearDraft) || currentPath === '/posts/new') { %>
+<script src="<%= asset('/draft.js') %>"></script>
+<% } %>
 </body>
 </html>

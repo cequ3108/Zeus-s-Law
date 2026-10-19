@@ -16,8 +16,12 @@
     <% if (selected) { %>
       <p class="hint">「<%= selected.label %>」建議 <%= selected.min %>–<%= selected.max %> 功德。金額仍由你自己填，模板只是起點。</p>
     <% } %>
-    <form method="post" action="/posts">
+    <form method="post" action="/posts" data-draft-user="<%= user.id %>">
       <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="draft-note" data-draft-notice hidden>
+        <p>已帶回上次未送出的草稿</p>
+        <button class="secondary" type="button" data-draft-clear>清除草稿</button>
+      </div>
       <fieldset class="field">
         <legend>這則是</legend>
         <% if (user.role === 'org') { %>

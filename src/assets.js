@@ -14,6 +14,7 @@ function hashFile(name) {
 const versions = {
   '/styles.css': hashFile('styles.css'),
   '/favicon.svg': hashFile('favicon.svg'),
+  '/draft.js': hashFile('draft.js'),
 };
 
 function asset(pathname) {

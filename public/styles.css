@@ -32,7 +32,7 @@ a:hover { color: var(--seal); }
 .wrap { width: min(760px, calc(100% - 32px)); margin: 0 auto; }
 .narrow { max-width: 560px; }
 
-input, button, select, textarea, nav, .ui, .hint, .meta, .cash-banner, .dev-banner, .blocked-banner, .announcement {
+input, button, select, textarea, nav, .ui, .hint, .meta, .cash-banner, .dev-banner, .blocked-banner, .announcement, .draft-note {
   font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
 }
 
@@ -91,6 +91,21 @@ nav a { color: inherit; }
 }
 .announcement form { margin: 0; }
 .announcement button { min-height: 44px; min-width: 44px; }
+.draft-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.draft-note[hidden] { display: none; }
+.draft-note p { margin: 0; flex: 1 1 12em; }
+.draft-note button { min-height: 44px; min-width: 44px; flex: 0 0 auto; }
 @media (max-width: 560px) {
   main:has(.announcement) .filter { grid-template-columns: 1fr 1fr auto; }
 }
