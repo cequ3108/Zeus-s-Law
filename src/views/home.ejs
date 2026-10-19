@@ -52,12 +52,17 @@
   <div class="post-list">
     <% posts.forEach(function (post) { %>
       <article class="card">
+        <div class="card-top">
         <p class="meta">
           <span class="tag tag-<%= post.kind %>"><%= kindLabel(post.kind) %></span>
           <span class="tag"><%= categoryLabel(post.category) %></span>
           <% if (post.city) { %><span class="tag"><%= post.city %><% if (post.district) { %> <%= post.district %><% } %></span><% } %>
           <span>標示 <%= formatMerit(post.amount) %> 功德</span>
         </p>
+        <% if (user && !user.blocked) { %>
+          <%- include('partials/bookmark', { postId: post.id, saved: !!post.bookmarked, returnTo: '/' }) %>
+        <% } %>
+        </div>
         <h2><a href="/posts/<%= post.id %>"><%= post.title || (kindLabel(post.kind) + ' · ' + categoryLabel(post.category)) %></a></h2>
         <p class="excerpt"><%= post.description %></p>
         <p class="meta">

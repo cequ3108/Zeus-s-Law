@@ -807,7 +807,7 @@ function createServices(db, options = {}) {
 
   function listOpenPosts(filter = {}) {
     const where = ['p.status = \'open\'', 'u.blocked = 0', '(p.expires_at IS NULL OR p.expires_at > ?)'];
-    const params = [clock().toISOString()];
+    const params = [filter.viewerId || 0, clock().toISOString()];
     if (filter.city) {
       where.push('p.city = ?');
       params.push(filter.city);
@@ -825,7 +825,8 @@ function createServices(db, options = {}) {
       params.push(filter.viewerId, filter.viewerId);
     }
     return db.prepare(`
-      SELECT p.id, p.kind, p.category, p.title, p.description, p.amount, p.created_at, p.city, p.district,
+      SELECT EXISTS(SELECT 1 FROM bookmarks b WHERE b.user_id = ? AND b.post_id = p.id) AS bookmarked,
+             p.id, p.kind, p.category, p.title, p.description, p.amount, p.created_at, p.city, p.district,
              u.id AS author_id, u.display_name AS author_name, u.role AS author_role,
              u.availability AS author_availability,
              (SELECT ROUND(AVG(stars), 1) FROM ratings WHERE ratee_id = u.id) AS author_avg,
@@ -903,6 +904,7 @@ function createServices(db, options = {}) {
       posts,
       actionCount,
       hidden: hiddenPeople(userId),
+      bookmarks: listBookmarks(userId),
       ...ratingSummary(userId),
       application: latestApplication(userId),
     };
@@ -1060,7 +1062,57 @@ function createServices(db, options = {}) {
       canRate: !!(isParty && settled && !myRating),
       myStars: myRating ? myRating.stars : null,
       loggedIn: !!viewer,
+      bookmarked: !!(viewer && db.prepare(
+        'SELECT 1 FROM bookmarks WHERE user_id = ? AND post_id = ?'
+      ).get(viewer.id, row.id)),
+      canBookmark: !!(viewer && viewer.blocked !== 1 && !pairHidden(viewer.id, row.author_id)),
     };
+  }
+
+  function toggleBookmark(userId, postId) {
+    const actor = mustUser(userId);
+    if (actor.blocked) throw new AppError('你的帳號已被封鎖，不能收藏。');
+    const post = db.prepare('SELECT id, author_id FROM posts WHERE id = ?').get(postId);
+    if (!post) throw new AppError('找不到這則互助。');
+    if (pairHidden(actor.id, post.author_id)) {
+      throw new AppError('你們已設定不想再遇到，不能收藏這則。');
+    }
+    const existing = db.prepare(
+      'SELECT 1 FROM bookmarks WHERE user_id = ? AND post_id = ?'
+    ).get(actor.id, post.id);
+    if (existing) {
+      db.prepare('DELETE FROM bookmarks WHERE user_id = ? AND post_id = ?').run(actor.id, post.id);
+      return { saved: false };
+    }
+    db.prepare(
+      'INSERT INTO bookmarks (user_id, post_id, created_at) VALUES (?, ?, ?)'
+    ).run(actor.id, post.id, clock().toISOString());
+    return { saved: true };
+  }
+
+  function listBookmarks(userId) {
+    const nowIso = clock().toISOString();
+    return db.prepare(`
+      SELECT p.id, p.title, p.description, p.kind, p.status, p.expires_at,
+             u.display_name AS author_name, b.created_at AS saved_at
+      FROM bookmarks b
+      JOIN posts p ON p.id = b.post_id
+      JOIN users u ON u.id = p.author_id
+      WHERE b.user_id = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM user_hides h
+          WHERE (h.user_id = ? AND h.hidden_user_id = p.author_id)
+             OR (h.hidden_user_id = ? AND h.user_id = p.author_id)
+        )
+      ORDER BY b.created_at DESC, p.id DESC
+    `).all(userId, userId, userId).map((post) => {
+      const expired = post.status === 'open' && post.expires_at && post.expires_at <= nowIso;
+      return {
+        ...post,
+        expired,
+        closed: expired || post.status === 'cancelled' || post.status === 'settled',
+      };
+    });
   }
 
   function announcementHours(raw) {
@@ -1256,6 +1308,8 @@ function createServices(db, options = {}) {
     pendingActions,
     getProfile,
     postPage,
+    toggleBookmark,
+    listBookmarks,
     adminSnapshot,
     findByMobile,
   };

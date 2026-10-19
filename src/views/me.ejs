@@ -45,6 +45,25 @@
     </article>
   <% }) %>
 
+  <h2>我的收藏</h2>
+  <% if (!dash.bookmarks.length) { %>
+    <p class="empty">目前沒有。</p>
+  <% } %>
+  <% dash.bookmarks.forEach(function (item) { %>
+    <article class="card<%= item.closed ? ' is-closed' : '' %>">
+      <p class="meta">
+        <span><%= item.expired ? '已過期' : statusLabel(item.status) %></span>
+        · <%= item.author_name %>
+      </p>
+      <h3><a href="/posts/<%= item.id %>"><%= item.title || item.description.slice(0, 42) %></a></h3>
+      <form class="bookmark-form" method="post" action="/posts/<%= item.id %>/bookmark">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <input type="hidden" name="return" value="/me">
+        <button class="secondary" type="submit">取消收藏</button>
+      </form>
+    </article>
+  <% }) %>
+
   <h2>我參與的互助</h2>
   <% if (!dash.posts.length) { %>
     <p class="empty">你還沒有發布或接下任何一則。</p>

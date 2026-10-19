@@ -1,0 +1,9 @@
+<form class="bookmark-form" method="post" action="/posts/<%= postId %>/bookmark">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <input type="hidden" name="return" value="<%= returnTo %>">
+  <button class="bookmark<%= saved ? ' saved' : '' %>" type="submit" data-bookmarked="<%= saved ? '1' : '0' %>" aria-pressed="<%= saved ? 'true' : 'false' %>" aria-label="<%= saved ? '取消收藏' : '收藏' %>">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+      <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-7-3.8L5 21V4.5a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+    </svg>
+  </button>
+</form>

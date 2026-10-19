@@ -8,7 +8,12 @@
     <span><%= statusLabel(model.status) %></span>
     <span><%= formatTaipei(model.createdAt) %></span>
   </p>
-  <h1><%= model.title || kindLabel(model.kind) %></h1>
+  <div class="post-title-row">
+    <h1><%= model.title || kindLabel(model.kind) %></h1>
+    <% if (model.canBookmark) { %>
+      <%- include('partials/bookmark', { postId: model.id, saved: !!model.bookmarked, returnTo: '/posts/' + model.id }) %>
+    <% } %>
+  </div>
   <p class="amount-line">標示 <strong><%= formatMerit(model.amount) %></strong> 功德</p>
   <p class="hint">約 1 元價值，僅供估價參考。功德不可購買、兌現或轉售。</p>
   <p class="description"><%= model.description %></p>

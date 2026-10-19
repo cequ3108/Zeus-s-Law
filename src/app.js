@@ -684,6 +684,21 @@ function createApp(options = {}) {
     }
   });
 
+  app.post('/posts/:id/bookmark', requireCsrf, requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    const back = safeReturn(req.body.return) || (id ? `/posts/${id}` : '/');
+    if (!id) {
+      res.redirect('/');
+      return;
+    }
+    try {
+      services.toggleBookmark(res.locals.user.id, id);
+      res.redirect(back);
+    } catch (err) {
+      handle(err, req, res, back);
+    }
+  });
+
   app.post('/posts/:id/rating', requireCsrf, requireLogin, (req, res) => {
     const id = parseId(req.params.id);
     const back = `/posts/${req.params.id}`;

@@ -110,6 +110,38 @@ main { padding-top: 8px; }
   padding: 16px 18px;
   margin: 12px 0;
 }
+.card-top, .post-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.card-top .meta { margin: 0; }
+.post-title-row h1 { flex: 1; }
+.bookmark-form { margin: 0; }
+button.bookmark {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+button.bookmark.saved {
+  color: var(--seal);
+  border-color: var(--seal);
+  background: #fde8e4;
+}
+button.bookmark.saved svg path { fill: currentColor; }
+.card.is-closed h3 a,
+.card.is-closed .meta,
+.card.is-closed .excerpt { color: var(--muted); }
 .balances { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .balance strong {
   display: block;
