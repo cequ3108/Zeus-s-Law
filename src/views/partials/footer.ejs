@@ -13,5 +13,6 @@
 <% if ((typeof clearDraft !== 'undefined' && clearDraft) || currentPath === '/posts/new') { %>
 <script src="<%= asset('/draft.js') %>"></script>
 <% } %>
+<script src="<%= asset('/pwa.js') %>" data-sw="<%= asset('/sw.js') %>"></script>
 </body>
 </html>

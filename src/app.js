@@ -1,9 +1,10 @@
 const crypto = require('crypto');
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
 const { SqliteStore } = require('./sessions');
-const { asset, publicDir } = require('./assets');
+const { asset, publicDir, manifestBody, swBody } = require('./assets');
 const { AppError } = require('./errors');
 const { cleanPassword } = require('./password');
 const { createServices } = require('./services');
@@ -120,6 +121,22 @@ function createApp(options = {}) {
     return '★'.repeat(full) + '☆'.repeat(5 - full);
   };
   app.locals.asset = asset;
+
+  app.get('/manifest.webmanifest', (req, res) => {
+    res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.send(manifestBody);
+  });
+  app.get('/sw.js', (req, res) => {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.send(swBody);
+  });
+  app.get('/sw-policy.js', (req, res) => {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.send(fs.readFileSync(path.join(publicDir, 'sw-policy.js')));
+  });
 
   app.use(express.urlencoded({ extended: false, limit: '32kb' }));
   app.use(express.static(publicDir, {

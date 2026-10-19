@@ -5,7 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %> · 宙斯法則</title>
   <meta name="description" content="宙斯法則：在台灣提供或請求幫助。沒有現金。功德在人之間流動。">
+  <meta name="theme-color" content="#9d1c1c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="宙斯法則">
   <link rel="icon" href="<%= asset('/favicon.svg') %>" type="image/svg+xml">
+  <link rel="apple-touch-icon" sizes="180x180" href="<%= asset('/apple-touch-icon.png') %>">
+  <link rel="manifest" href="<%= asset('/manifest.webmanifest') %>">
   <link rel="stylesheet" href="<%= asset('/styles.css') %>">
 </head>
 <body class="<%= compactAuth ? 'auth' : '' %>"<% if (typeof clearDraft !== 'undefined' && (clearDraft === 'all' || /^[0-9]+$/.test(String(clearDraft)))) { %> data-clear-draft="<%= clearDraft %>"<% } %>>

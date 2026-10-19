@@ -20,5 +20,16 @@
       <% } %>
     </section>
   <% }) %>
+  <section aria-label="如何加到主畫面">
+    <h2>如何加到主畫面</h2>
+    <ul>
+      <li>iPhone：用 Safari 打開本站，按分享，再點「加入主畫面」。</li>
+      <li>Android：用 Chrome 打開本站，按選單，再點「安裝應用程式」。</li>
+    </ul>
+    <p data-install-prompt hidden>
+      <button type="button" data-install-button>安裝到主畫面</button>
+    </p>
+  </section>
 </main>
+<script src="<%= asset('/install.js') %>"></script>
 <%- include('partials/footer') %>
