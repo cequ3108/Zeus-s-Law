@@ -47,6 +47,13 @@
     <% if (profile.ratingCount) { %>
       <p class="stars big-stars"><%= starGlyph(profile.ratingAvg) %></p>
       <p>平均 <%= profile.ratingAvg %> / 5，共 <%= profile.ratingCount %> 則。</p>
+      <% if (profile.tags.length) { %>
+        <p class="tag-counts" aria-label="評價標籤">
+          <% profile.tags.forEach(function (item) { %>
+            <span class="tag"><%= item.tag %> ×<%= item.count %></span>
+          <% }) %>
+        </p>
+      <% } %>
     <% } else { %>
       <p>尚無星等。</p>
     <% } %>

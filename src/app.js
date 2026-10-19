@@ -8,7 +8,7 @@ const { AppError } = require('./errors');
 const { cleanPassword } = require('./password');
 const { createServices } = require('./services');
 const { isDevMode } = require('./sms');
-const { ROLES, KINDS, CATEGORIES, STATUSES } = require('./constants');
+const { ROLES, KINDS, CATEGORIES, STATUSES, RATING_TAGS } = require('./constants');
 const { CITIES, normalizeCity } = require('./places');
 const { templatesFor, findTemplate } = require('./templates');
 const { formatMerit, formatTaipei } = require('./time');
@@ -101,6 +101,7 @@ function createApp(options = {}) {
   app.locals.kindLabel = (kind) => KINDS[kind] || kind;
   app.locals.categoryLabel = (category) => CATEGORIES[category] || category;
   app.locals.statusLabel = (status) => STATUSES[status] || status;
+  app.locals.ratingTags = RATING_TAGS;
   app.locals.ledgerReason = (reason) => ({
     signup: '註冊',
     founder_seed: '建立創辦人',
@@ -687,7 +688,7 @@ function createApp(options = {}) {
     const id = parseId(req.params.id);
     const back = `/posts/${req.params.id}`;
     try {
-      services.rate(id, res.locals.user.id, req.body.stars, req.body.comment);
+      services.rate(id, res.locals.user.id, req.body.stars, req.body.comment, req.body.tags);
       redirectWith(req, res, back, { type: 'ok', message: '已送出星等。星等會出現在對方的個人頁，備註不會顯示。' });
     } catch (err) {
       handle(err, req, res, back);

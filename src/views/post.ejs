@@ -139,6 +139,15 @@
             <label class="choice"><input type="radio" name="stars" value="<%= star %>" required> <%= star %> 星</label>
           <% } %>
         </fieldset>
+        <fieldset class="field">
+          <legend>正向標籤（可不選，最多 3 個）</legend>
+          <div class="tag-picks">
+            <% ratingTags.forEach(function (tag) { %>
+              <label class="choice"><input type="checkbox" name="tags" value="<%= tag %>"> <%= tag %></label>
+            <% }) %>
+          </div>
+          <p class="hint">只放正向的印象。不選也可以送出。</p>
+        </fieldset>
         <div class="field">
           <label for="comment">備註</label>
           <textarea id="comment" name="comment" maxlength="500"></textarea>

@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { AppError } = require('./errors');
-const { CATEGORIES, ENDOWMENTS, MAX_AMOUNT } = require('./constants');
+const { CATEGORIES, ENDOWMENTS, MAX_AMOUNT, RATING_TAGS } = require('./constants');
 const { taipeiDate, weekRange } = require('./time');
 const sms = require('./sms');
 const { cleanPassword, hashPassword, verifyPassword, temporaryPassword } = require('./password');
@@ -548,23 +548,56 @@ function createServices(db, options = {}) {
     }).immediate();
   }
 
-  function rate(postId, userId, rawStars, rawComment) {
+  function cleanRatingTags(raw) {
+    if (raw == null || raw === '') return [];
+    const incoming = Array.isArray(raw) ? raw : [raw];
+    const tags = [];
+    for (const item of incoming) {
+      const tag = String(item ?? '').trim();
+      if (!tag) continue;
+      if (!RATING_TAGS.includes(tag)) throw new AppError('請只選列出的正向標籤。');
+      if (!tags.includes(tag)) tags.push(tag);
+    }
+    if (tags.length > 3) throw new AppError('正向標籤最多選 3 個。');
+    return tags;
+  }
+
+  function rate(postId, userId, rawStars, rawComment, rawTags) {
     const stars = Number(rawStars);
     if (!Number.isInteger(stars) || stars < 1 || stars > 5) throw new AppError('請給 1 到 5 顆星。');
     const comment = cleanComment(rawComment);
+    const tags = cleanRatingTags(rawTags);
     const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
     if (!post || post.status !== 'settled') throw new AppError('結算完成後才能評分。');
     if (userId !== post.host_id && userId !== post.seeker_id) throw new AppError('只有雙方可以評分。');
     const rateeId = userId === post.host_id ? post.seeker_id : post.host_id;
-    try {
-      db.prepare(`
+    const save = db.transaction(() => {
+      const info = db.prepare(`
         INSERT INTO ratings (post_id, rater_id, ratee_id, stars, comment, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `).run(post.id, userId, rateeId, stars, comment, clock().toISOString());
+      const ratingId = Number(info.lastInsertRowid);
+      const insertTag = db.prepare('INSERT INTO rating_tags (rating_id, tag) VALUES (?, ?)');
+      for (const tag of tags) insertTag.run(ratingId, tag);
+    });
+    try {
+      save();
     } catch (err) {
       if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') throw new AppError('你已經評過這次互助。');
       throw err;
     }
+  }
+
+  function topRatingTags(userId) {
+    return db.prepare(`
+      SELECT t.tag AS tag, COUNT(*) AS count
+      FROM rating_tags t
+      JOIN ratings r ON r.id = t.rating_id
+      WHERE r.ratee_id = ?
+      GROUP BY t.tag
+      ORDER BY count DESC, t.tag ASC
+      LIMIT 3
+    `).all(userId);
   }
 
   function blockUser(actorId, rawMobile, reason) {
@@ -888,7 +921,7 @@ function createServices(db, options = {}) {
       WHERE r.ratee_id = ?
       ORDER BY r.id DESC
     `).all(userId);
-    return { user, ratings, reputation: reputation(userId), ...ratingSummary(userId) };
+    return { user, ratings, tags: topRatingTags(userId), reputation: reputation(userId), ...ratingSummary(userId) };
   }
 
   function lineShareFor(viewer, row) {

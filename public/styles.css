@@ -140,6 +140,10 @@ main { padding-top: 8px; }
 .tag-need { background: #f3d6d0; color: #6d1a16; }
 .tag-offer { background: #d7eadc; color: var(--good); }
 .tag-task { background: #f4e3a8; color: #3d3208; font-weight: 750; }
+.tag-picks { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+.tag-picks .choice { display: flex; align-items: center; gap: 8px; min-height: 44px; margin: 0; }
+.tag-counts { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
+.tag-counts .tag { display: inline-flex; align-items: center; min-height: 36px; padding: 6px 12px; }
 
 .flash { padding: 12px 14px; border-radius: 12px; }
 .flash-ok { background: #e5f4ea; color: var(--good); }

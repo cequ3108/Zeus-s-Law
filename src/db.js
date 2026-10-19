@@ -94,6 +94,15 @@ CREATE TABLE IF NOT EXISTS ratings (
 
 CREATE INDEX IF NOT EXISTS idx_ratings_ratee ON ratings (ratee_id);
 
+CREATE TABLE IF NOT EXISTS rating_tags (
+  id INTEGER PRIMARY KEY,
+  rating_id INTEGER NOT NULL REFERENCES ratings(id),
+  tag TEXT NOT NULL,
+  UNIQUE (rating_id, tag)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rating_tags_tag ON rating_tags (tag);
+
 CREATE TABLE IF NOT EXISTS ledger (
   id INTEGER PRIMARY KEY,
   created_at TEXT NOT NULL,
@@ -208,6 +217,13 @@ function migrate(db) {
       created_at TEXT NOT NULL,
       PRIMARY KEY (user_id, announcement_id)
     );
+    CREATE TABLE IF NOT EXISTS rating_tags (
+      id INTEGER PRIMARY KEY,
+      rating_id INTEGER NOT NULL REFERENCES ratings(id),
+      tag TEXT NOT NULL,
+      UNIQUE (rating_id, tag)
+    );
+    CREATE INDEX IF NOT EXISTS idx_rating_tags_tag ON rating_tags (tag);
   `);
 }
 

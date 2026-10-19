@@ -30,6 +30,8 @@ const ENDOWMENTS = {
 
 const MAX_AMOUNT = 100_000_000;
 
+const RATING_TAGS = ['準時', '親切', '溝通清楚', '份量實在', '守約', '乾淨整潔'];
+
 module.exports = {
   ROLES,
   KINDS,
@@ -37,4 +39,5 @@ module.exports = {
   STATUSES,
   ENDOWMENTS,
   MAX_AMOUNT,
+  RATING_TAGS,
 };
