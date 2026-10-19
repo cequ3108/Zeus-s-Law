@@ -1,0 +1,18 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap hide-confirm">
+  <h1>不想再遇到這個人</h1>
+  <p>確定把「<%= person.display_name %>」列入不想再遇到？</p>
+  <ul>
+    <li>對方不會收到通知，個人頁也不會顯示這件事。</li>
+    <li>之後你們在廣場上看不到彼此的貼文，也不能接下。</li>
+    <li>已經在進行或完成的互助不會取消，星等也會留著。</li>
+  </ul>
+  <form method="post" action="/users/<%= person.id %>/hide">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <input type="hidden" name="confirm" value="1">
+    <button type="submit">確定，不想再遇到</button>
+  </form>
+  <p><a class="button secondary" href="/users/<%= person.id %>">先不要</a></p>
+</main>
+<%- include('partials/footer') %>

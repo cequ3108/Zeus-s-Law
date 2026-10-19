@@ -182,6 +182,10 @@ function createApp(options = {}) {
     if (post) return `/posts/${post[1]}`;
     if (req.path === '/account' || req.path.startsWith('/account/')) return '/account';
     if (req.path.startsWith('/admin')) return '/admin';
+    const personalHide = String(req.path || '').match(/^\/users\/(\d+)\/(?:hide|unhide)$/);
+    if (personalHide) {
+      return req.path.endsWith('/unhide') ? '/me' : `/users/${personalHide[1]}/hide`;
+    }
     if (req.path.startsWith('/org')) return '/org/apply';
     if (req.path === '/posts' || req.path === '/posts/new') return '/posts/new';
     if (req.path === '/forgot' || req.path === '/forgot/reset') return '/forgot';
@@ -313,7 +317,11 @@ function createApp(options = {}) {
     const category = CATEGORIES[req.query.category] ? req.query.category : '';
     res.render('home', {
       title: '廣場',
-      posts: services.listOpenPosts({ city: normalized || null, category: category || null }),
+      posts: services.listOpenPosts({
+        city: normalized || null,
+        category: category || null,
+        viewerId: res.locals.user && res.locals.user.id,
+      }),
       cities: CITIES,
       filterCity: normalized || 'all',
       filterCategory: category,
@@ -684,6 +692,82 @@ function createApp(options = {}) {
     }
   });
 
+  function renderHideConfirm(req, res, person) {
+    res.render('hide-confirm', { title: '不想再遇到', person });
+  }
+
+  app.get('/users/:id/hide', requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    const profile = id ? services.getProfile(id) : null;
+    const back = `/users/${req.params.id}`;
+    if (!profile) {
+      res.status(404).render('error', { title: '找不到', message: '找不到這位使用者。' });
+      return;
+    }
+    try {
+      const check = services.assertCanHide(res.locals.user.id, id);
+      if (check.already) {
+        redirectWith(req, res, '/me', { type: 'ok', message: '這個人已經在你的清單裡。' });
+        return;
+      }
+    } catch (err) {
+      handle(err, req, res, back);
+      return;
+    }
+    renderHideConfirm(req, res, profile.user);
+  });
+
+  app.post('/users/:id/hide', requireCsrf, requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    const back = `/users/${req.params.id}`;
+    if (!id) {
+      res.redirect('/me');
+      return;
+    }
+    const profile = services.getProfile(id);
+    if (!profile) {
+      res.status(404).render('error', { title: '找不到', message: '找不到這位使用者。' });
+      return;
+    }
+    if (req.body.confirm !== '1') {
+      try {
+        const check = services.assertCanHide(res.locals.user.id, id);
+        if (check.already) {
+          redirectWith(req, res, '/me', { type: 'ok', message: '這個人已經在你的清單裡。' });
+          return;
+        }
+      } catch (err) {
+        handle(err, req, res, back);
+        return;
+      }
+      renderHideConfirm(req, res, profile.user);
+      return;
+    }
+    try {
+      services.hideUser(res.locals.user.id, id);
+      redirectWith(req, res, '/me', {
+        type: 'ok',
+        message: '已列入不想再遇到。對方不會收到通知。進行中的互助不會取消。',
+      });
+    } catch (err) {
+      handle(err, req, res, back);
+    }
+  });
+
+  app.post('/users/:id/unhide', requireCsrf, requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    if (!id) {
+      res.redirect('/me');
+      return;
+    }
+    try {
+      services.unhideUser(res.locals.user.id, id);
+      redirectWith(req, res, '/me', { type: 'ok', message: '已從不想再遇到的清單移除。' });
+    } catch (err) {
+      handle(err, req, res, '/me');
+    }
+  });
+
   app.get('/users/:id', (req, res) => {
     const id = parseId(req.params.id);
     const profile = id ? services.getProfile(id) : null;
@@ -692,7 +776,10 @@ function createApp(options = {}) {
       return;
     }
     const own = res.locals.user && res.locals.user.id === profile.user.id ? res.locals.user : null;
-    res.render('profile', { title: profile.user.display_name, profile, own });
+    const canHide = res.locals.user
+      ? services.hideRelation(res.locals.user.id, profile.user.id).canHide
+      : false;
+    res.render('profile', { title: profile.user.display_name, profile, own, canHide });
   });
 
   app.get('/org/apply', requireLogin, (req, res) => {

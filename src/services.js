@@ -384,6 +384,9 @@ function createServices(db, options = {}) {
       if (actor.blocked) throw new AppError('你的帳號已被封鎖，不能發布或接下。');
       if (author.blocked) throw new AppError('發布者已被封鎖，這則不能接下。');
       if (actor.id === author.id) throw new AppError('不能接下自己的貼文。');
+      if (pairHidden(actor.id, author.id)) {
+        throw new AppError('你們已設定不想再遇到，不能接下這則。');
+      }
 
       const payer = post.kind === 'offer' ? actor : author;
       const host = post.kind === 'offer' ? author : actor;
@@ -582,6 +585,73 @@ function createServices(db, options = {}) {
     return mustUser(user.id);
   }
 
+  function inspectHide(actorId, targetId) {
+    const actor = mustUser(actorId);
+    const target = db.prepare('SELECT id, display_name, role FROM users WHERE id = ?').get(targetId);
+    if (!target) return { ok: false, message: '找不到這位使用者。' };
+    if (actor.id === target.id) return { ok: false, message: '不能把自己列入不想再遇到。' };
+    if (actor.role !== 'user') return { ok: false, message: '只有一般使用者可以設定不想再遇到。' };
+    if (target.role !== 'user') return { ok: false, message: '創辦人與福利機構不能列入不想再遇到。' };
+    const already = !!db.prepare(
+      'SELECT 1 FROM user_hides WHERE user_id = ? AND hidden_user_id = ?'
+    ).get(actor.id, target.id);
+    return { ok: true, already, target };
+  }
+
+  function assertCanHide(actorId, targetId) {
+    const check = inspectHide(actorId, targetId);
+    if (!check.ok) throw new AppError(check.message);
+    return check;
+  }
+
+  function hideUser(actorId, targetId) {
+    const check = assertCanHide(actorId, targetId);
+    if (!check.already) {
+      db.prepare(
+        'INSERT INTO user_hides (user_id, hidden_user_id, created_at) VALUES (?, ?, ?)'
+      ).run(actorId, targetId, clock().toISOString());
+    }
+    return check.target;
+  }
+
+  function unhideUser(actorId, targetId) {
+    const changed = db.prepare(
+      'DELETE FROM user_hides WHERE user_id = ? AND hidden_user_id = ?'
+    ).run(actorId, targetId);
+    if (changed.changes !== 1) throw new AppError('這個人不在你的清單裡。');
+  }
+
+  function pairHidden(leftId, rightId) {
+    if (!leftId || !rightId || leftId === rightId) return false;
+    return !!db.prepare(`
+      SELECT 1 FROM user_hides
+      WHERE (user_id = ? AND hidden_user_id = ?)
+         OR (user_id = ? AND hidden_user_id = ?)
+    `).get(leftId, rightId, rightId, leftId);
+  }
+
+  function hideRelation(viewerId, targetId) {
+    if (!viewerId || !targetId) return { canHide: false };
+    const check = inspectHide(viewerId, targetId);
+    return { canHide: !!(check.ok && !check.already) };
+  }
+
+  function hiddenPeople(userId) {
+    return db.prepare(`
+      SELECT u.id, u.display_name, h.created_at
+      FROM user_hides h
+      JOIN users u ON u.id = h.hidden_user_id
+      WHERE h.user_id = ?
+      ORDER BY h.created_at DESC, u.id DESC
+    `).all(userId);
+  }
+
+  function hiddenByCount(userId) {
+    return db.prepare(
+      'SELECT COUNT(*) AS count FROM user_hides WHERE hidden_user_id = ?'
+    ).get(userId).count;
+  }
+
   function closePendingApplications(userId, status, keepId) {
     db.prepare(`
       UPDATE org_applications SET status = ?
@@ -713,6 +783,14 @@ function createServices(db, options = {}) {
       where.push('p.category = ?');
       params.push(filter.category);
     }
+    if (filter.viewerId) {
+      where.push(`NOT EXISTS (
+        SELECT 1 FROM user_hides h
+        WHERE (h.user_id = ? AND h.hidden_user_id = p.author_id)
+           OR (h.hidden_user_id = ? AND h.user_id = p.author_id)
+      )`);
+      params.push(filter.viewerId, filter.viewerId);
+    }
     return db.prepare(`
       SELECT p.id, p.kind, p.category, p.title, p.description, p.amount, p.created_at, p.city, p.district,
              u.id AS author_id, u.display_name AS author_name, u.role AS author_role,
@@ -787,7 +865,14 @@ function createServices(db, options = {}) {
       return rank(a) - rank(b) || b.id - a.id;
     });
     const actionCount = posts.filter((post) => post.task === '待填估價' || post.task === '待評分').length;
-    return { user, posts, actionCount, ...ratingSummary(userId), application: latestApplication(userId) };
+    return {
+      user,
+      posts,
+      actionCount,
+      hidden: hiddenPeople(userId),
+      ...ratingSummary(userId),
+      application: latestApplication(userId),
+    };
   }
 
   function getProfile(userId) {
@@ -854,6 +939,8 @@ function createServices(db, options = {}) {
         acceptHint = '你的帳號已被封鎖，不能接下。';
       } else if (row.author_blocked) {
         acceptHint = '發布者已被封鎖，不能接下。';
+      } else if (pairHidden(viewer.id, row.author_id)) {
+        acceptHint = '你們已設定不想再遇到，不能接下這則。';
       } else {
         const payerIsViewer = row.kind === 'offer';
         const payerMerit = payerIsViewer ? viewer.merit : row.author_merit;
@@ -925,6 +1012,7 @@ function createServices(db, options = {}) {
       seekerValue: settled ? row.seeker_value : null,
       canAccept,
       acceptHint,
+      canHideAuthor: hideRelation(viewer && viewer.id, row.author_id).canHide,
       expiresAt: row.expires_at,
       expired,
       canCancel: !!(viewer && viewer.id === row.author_id && row.status === 'open' && !expired),
@@ -969,6 +1057,7 @@ function createServices(db, options = {}) {
             quota: user.quota,
             blocked: user.blocked === 1,
             blockReason: user.block_reason,
+            hiddenBy: hiddenByCount(user.id),
           }
           : { missing: true };
       } catch (err) {
@@ -1010,6 +1099,12 @@ function createServices(db, options = {}) {
     rate,
     blockUser,
     unblockUser,
+    hideUser,
+    unhideUser,
+    assertCanHide,
+    hideRelation,
+    pairHidden,
+    hiddenByCount,
     createOrg,
     applyOrg,
     approveApplication,

@@ -117,6 +117,16 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_expire ON sessions (expire);
 
+CREATE TABLE IF NOT EXISTS user_hides (
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  hidden_user_id INTEGER NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, hidden_user_id),
+  CHECK (user_id != hidden_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_hides_hidden ON user_hides (hidden_user_id);
+
 CREATE TRIGGER IF NOT EXISTS ledger_no_update
 BEFORE UPDATE ON ledger
 BEGIN
@@ -157,6 +167,16 @@ function migrate(db) {
   addColumn(db, 'posts', 'expires_at', 'TEXT');
   addColumn(db, 'posts', 'meeting_place', 'TEXT');
   addColumn(db, 'posts', 'meeting_time', 'TEXT');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_hides (
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      hidden_user_id INTEGER NOT NULL REFERENCES users(id),
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, hidden_user_id),
+      CHECK (user_id != hidden_user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_hides_hidden ON user_hides (hidden_user_id);
+  `);
 }
 
 function openDatabase(dbPath) {

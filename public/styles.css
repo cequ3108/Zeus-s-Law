@@ -174,7 +174,20 @@ button + button, form + form { margin-top: 8px; }
   font-variant-numeric: tabular-nums;
 }
 
+.hide-form { margin: 12px 0 16px; }
+.hide-form button,
+.hide-confirm button,
+.hide-confirm .button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+}
+.hide-confirm .button { margin-top: 8px; }
+
 .pending { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 10px 0; }
+.pending button { min-height: 44px; }
 .pending form { margin: 0; }
 .pending p { margin: 0; flex: 1 1 220px; }
 

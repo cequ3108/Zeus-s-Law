@@ -25,6 +25,7 @@
         · 額度 <%= formatMerit(data.lookup.quota) %>
         <% if (data.lookup.blocked) { %> · 已封鎖（<%= data.lookup.blockReason %>）<% } %>
       </p>
+      <p>不想再遇到：<%= data.lookup.hiddenBy %> 位會員把這個人列入自己的清單。這只是審核參考，不會封鎖帳號。</p>
     <% } %>
   </section>
 

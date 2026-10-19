@@ -11,6 +11,12 @@
   <% if (profile.user.availability) { %>
     <p>今日空檔：<%= profile.user.availability %></p>
   <% } %>
+  <% if (canHide) { %>
+    <form class="hide-form" method="post" action="/users/<%= profile.user.id %>/hide">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="secondary" type="submit">不想再遇到這個人</button>
+    </form>
+  <% } %>
   <% if (own) { %>
     <section class="balances" aria-label="我的餘額">
       <article class="card balance">

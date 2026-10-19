@@ -31,6 +31,20 @@
     <p><a class="button" href="/posts/new">發布一則</a></p>
   <% } %>
 
+  <h2>我封鎖的人</h2>
+  <% if (!dash.hidden.length) { %>
+    <p class="empty">目前沒有。</p>
+  <% } %>
+  <% dash.hidden.forEach(function (person) { %>
+    <article class="pending">
+      <p><a href="/users/<%= person.id %>"><%= person.display_name %></a></p>
+      <form method="post" action="/users/<%= person.id %>/unhide">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="secondary" type="submit">解除</button>
+      </form>
+    </article>
+  <% }) %>
+
   <h2>我參與的互助</h2>
   <% if (!dash.posts.length) { %>
     <p class="empty">你還沒有發布或接下任何一則。</p>
