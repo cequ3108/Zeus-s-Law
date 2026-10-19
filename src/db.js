@@ -127,6 +127,23 @@ CREATE TABLE IF NOT EXISTS user_hides (
 
 CREATE INDEX IF NOT EXISTS idx_user_hides_hidden ON user_hides (hidden_user_id);
 
+CREATE TABLE IF NOT EXISTS announcements (
+  id INTEGER PRIMARY KEY,
+  author_id INTEGER NOT NULL REFERENCES users(id),
+  title TEXT,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  removed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS announcement_dismissals (
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  announcement_id INTEGER NOT NULL REFERENCES announcements(id),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, announcement_id)
+);
+
 CREATE TRIGGER IF NOT EXISTS ledger_no_update
 BEFORE UPDATE ON ledger
 BEGIN
@@ -176,6 +193,21 @@ function migrate(db) {
       CHECK (user_id != hidden_user_id)
     );
     CREATE INDEX IF NOT EXISTS idx_user_hides_hidden ON user_hides (hidden_user_id);
+    CREATE TABLE IF NOT EXISTS announcements (
+      id INTEGER PRIMARY KEY,
+      author_id INTEGER NOT NULL REFERENCES users(id),
+      title TEXT,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      removed_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS announcement_dismissals (
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      announcement_id INTEGER NOT NULL REFERENCES announcements(id),
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, announcement_id)
+    );
   `);
 }
 

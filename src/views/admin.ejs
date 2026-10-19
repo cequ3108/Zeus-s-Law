@@ -5,6 +5,61 @@
   <p>創辦人可以建立福利機構、審核申請，以及封鎖收取現金的帳號。創辦人本身不是從這個頁面註冊出來的。</p>
 
   <section class="card">
+    <h2>站內公告</h2>
+    <p class="hint">顯示在廣場最上方，一次只有最新一則。標題可不填。內文 1 到 40 個字，大約一兩行。時效沒填就是 72 小時。撤下或到期後就不再顯示。</p>
+    <form method="post" action="/admin/announcements">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="announcement_title">標題（可不填）</label>
+        <input id="announcement_title" name="title" maxlength="20">
+      </div>
+      <div class="field">
+        <label for="announcement_body">內文</label>
+        <textarea id="announcement_body" name="body" rows="2" maxlength="40" required></textarea>
+      </div>
+      <div class="field">
+        <label for="announcement_hours">時效（小時）</label>
+        <input id="announcement_hours" name="hours" inputmode="numeric" value="72">
+      </div>
+      <button type="submit">發布公告</button>
+    </form>
+    <% if (!data.announcements.length) { %><p class="empty">目前沒有公告。</p><% } %>
+    <% data.announcements.forEach(function (item) { %>
+      <article>
+        <p>
+          <% if (item.title) { %><strong><%= item.title %></strong> <% } %><%= item.body %>
+        </p>
+        <p class="meta">
+          <%= item.live ? '廣場上顯示中' : (item.removed ? '已撤下' : (item.expired ? '已到期' : '較新的一則顯示中')) %>
+          · 到 <%= formatTaipei(item.expires_at) %>
+        </p>
+        <% if (!item.removed) { %>
+          <form method="post" action="/admin/announcements/<%= item.id %>">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <div class="field">
+              <label for="edit_title_<%= item.id %>">修改標題</label>
+              <input id="edit_title_<%= item.id %>" name="title" value="<%= item.title || '' %>" maxlength="20">
+            </div>
+            <div class="field">
+              <label for="edit_body_<%= item.id %>">修改內文</label>
+              <input id="edit_body_<%= item.id %>" name="body" value="<%= item.body %>" maxlength="40" required>
+            </div>
+            <div class="field">
+              <label for="edit_hours_<%= item.id %>">修改時效（小時，從現在起算）</label>
+              <input id="edit_hours_<%= item.id %>" name="hours" value="72" inputmode="numeric">
+            </div>
+            <button class="secondary" type="submit">修改</button>
+          </form>
+          <form method="post" action="/admin/announcements/<%= item.id %>/remove">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <button class="secondary" type="submit">撤下</button>
+          </form>
+        <% } %>
+      </article>
+    <% }) %>
+  </section>
+
+  <section class="card">
     <h2>查帳號</h2>
     <form method="get" action="/admin">
       <div class="field">

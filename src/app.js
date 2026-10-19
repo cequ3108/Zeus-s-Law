@@ -182,6 +182,7 @@ function createApp(options = {}) {
     if (post) return `/posts/${post[1]}`;
     if (req.path === '/account' || req.path.startsWith('/account/')) return '/account';
     if (req.path.startsWith('/admin')) return '/admin';
+    if (req.path.startsWith('/announcements/')) return '/';
     const personalHide = String(req.path || '').match(/^\/users\/(\d+)\/(?:hide|unhide)$/);
     if (personalHide) {
       return req.path.endsWith('/unhide') ? '/me' : `/users/${personalHide[1]}/hide`;
@@ -325,6 +326,7 @@ function createApp(options = {}) {
       cities: CITIES,
       filterCity: normalized || 'all',
       filterCategory: category,
+      announcement: services.currentAnnouncement(res.locals.user && res.locals.user.id),
     });
   });
 
@@ -811,6 +813,57 @@ function createApp(options = {}) {
 
   app.get('/admin', requireFounder, (req, res) => {
     renderAdmin(req, res);
+  });
+
+  app.post('/admin/announcements', requireCsrf, requireFounder, (req, res) => {
+    try {
+      services.createAnnouncement(res.locals.user.id, req.body);
+      redirectWith(req, res, '/admin', { type: 'ok', message: '已發布公告。廣場只顯示最新一則。' });
+    } catch (err) {
+      handle(err, req, res, '/admin');
+    }
+  });
+
+  app.post('/admin/announcements/:id/remove', requireCsrf, requireFounder, (req, res) => {
+    const id = parseId(req.params.id);
+    if (!id) {
+      res.redirect('/admin');
+      return;
+    }
+    try {
+      services.removeAnnouncement(res.locals.user.id, id);
+      redirectWith(req, res, '/admin', { type: 'ok', message: '已撤下公告。' });
+    } catch (err) {
+      handle(err, req, res, '/admin');
+    }
+  });
+
+  app.post('/admin/announcements/:id', requireCsrf, requireFounder, (req, res) => {
+    const id = parseId(req.params.id);
+    if (!id) {
+      res.redirect('/admin');
+      return;
+    }
+    try {
+      services.updateAnnouncement(res.locals.user.id, id, req.body);
+      redirectWith(req, res, '/admin', { type: 'ok', message: '已更新公告。' });
+    } catch (err) {
+      handle(err, req, res, '/admin');
+    }
+  });
+
+  app.post('/announcements/:id/dismiss', requireCsrf, requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    if (!id) {
+      res.redirect('/');
+      return;
+    }
+    try {
+      services.dismissAnnouncement(res.locals.user.id, id);
+      redirectWith(req, res, '/', { type: 'ok', message: '已知道這則公告。' });
+    } catch (err) {
+      handle(err, req, res, '/');
+    }
   });
 
   app.post('/admin/password', requireCsrf, requireFounder, (req, res) => {

@@ -1030,6 +1030,107 @@ function createServices(db, options = {}) {
     };
   }
 
+  function announcementHours(raw) {
+    if (raw == null || String(raw).trim() === '') return 72;
+    const hours = Number(raw);
+    if (!Number.isInteger(hours) || hours < 1 || hours > 720) {
+      throw new AppError('公告時效請填 1 到 720 小時。沒填就是 72 小時。');
+    }
+    return hours;
+  }
+
+  function cleanAnnouncementBody(raw) {
+    const text = String(raw || '').replace(/[\u0000-\u001F]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if ([...text].length < 1) throw new AppError('公告內文必須填寫。');
+    if ([...text].length > 40) throw new AppError('公告內文請不要超過 40 個字，大約一兩行。');
+    return text;
+  }
+
+  function announcementFields(input) {
+    return {
+      title: cleanOptional(input.title, '標題', 20),
+      body: cleanAnnouncementBody(input.body),
+      expiresAt: expiresAt(announcementHours(input.hours)),
+    };
+  }
+
+  function createAnnouncement(actorId, input) {
+    const actor = assertFounder(actorId);
+    const fields = announcementFields(input);
+    const info = db.prepare(`
+      INSERT INTO announcements (author_id, title, body, created_at, expires_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(actor.id, fields.title, fields.body, clock().toISOString(), fields.expiresAt);
+    return db.prepare('SELECT * FROM announcements WHERE id = ?').get(Number(info.lastInsertRowid));
+  }
+
+  function updateAnnouncement(actorId, announcementId, input) {
+    assertFounder(actorId);
+    const row = db.prepare('SELECT * FROM announcements WHERE id = ?').get(announcementId);
+    if (!row) throw new AppError('找不到這則公告。');
+    if (row.removed_at) throw new AppError('已撤下的公告不能再改。');
+    const fields = announcementFields(input);
+    db.prepare(`
+      UPDATE announcements SET title = ?, body = ?, expires_at = ? WHERE id = ?
+    `).run(fields.title, fields.body, fields.expiresAt, row.id);
+    return db.prepare('SELECT * FROM announcements WHERE id = ?').get(row.id);
+  }
+
+  function removeAnnouncement(actorId, announcementId) {
+    assertFounder(actorId);
+    const row = db.prepare('SELECT * FROM announcements WHERE id = ?').get(announcementId);
+    if (!row) throw new AppError('找不到這則公告。');
+    if (!row.removed_at) {
+      db.prepare('UPDATE announcements SET removed_at = ? WHERE id = ?').run(clock().toISOString(), row.id);
+    }
+    return db.prepare('SELECT * FROM announcements WHERE id = ?').get(row.id);
+  }
+
+  function currentAnnouncement(viewerId) {
+    const row = db.prepare(`
+      SELECT id, title, body, expires_at
+      FROM announcements
+      WHERE removed_at IS NULL AND expires_at > ?
+      ORDER BY id DESC
+      LIMIT 1
+    `).get(clock().toISOString());
+    if (!row) return null;
+    if (!viewerId) return row;
+    const dismissed = db.prepare(`
+      SELECT 1 FROM announcement_dismissals
+      WHERE user_id = ? AND announcement_id = ?
+    `).get(viewerId, row.id);
+    return dismissed ? null : row;
+  }
+
+  function dismissAnnouncement(userId, announcementId) {
+    const user = mustUser(userId);
+    const row = db.prepare('SELECT id FROM announcements WHERE id = ?').get(announcementId);
+    if (!row) throw new AppError('找不到這則公告。');
+    db.prepare(`
+      INSERT OR IGNORE INTO announcement_dismissals (user_id, announcement_id, created_at)
+      VALUES (?, ?, ?)
+    `).run(user.id, row.id, clock().toISOString());
+  }
+
+  function listAnnouncements() {
+    const now = clock().toISOString();
+    const rows = db.prepare(`
+      SELECT id, title, body, created_at, expires_at, removed_at
+      FROM announcements
+      ORDER BY id DESC
+      LIMIT 8
+    `).all();
+    let showing = false;
+    return rows.map((row) => {
+      const removed = !!row.removed_at;
+      const expired = !removed && row.expires_at <= now;
+      const live = !removed && !expired && !showing;
+      if (live) showing = true;
+      return { ...row, removed, expired, live };
+    });
+  }
+
   function adminSnapshot(actorId, lookupMobile) {
     assertFounder(actorId);
     const applications = db.prepare(`
@@ -1073,7 +1174,7 @@ function createServices(db, options = {}) {
       ORDER BY l.id DESC
       LIMIT 30
     `).all();
-    return { applications, blocked, lookup, ledger };
+    return { applications, blocked, lookup, ledger, announcements: listAnnouncements() };
   }
 
   return {
@@ -1105,6 +1206,11 @@ function createServices(db, options = {}) {
     hideRelation,
     pairHidden,
     hiddenByCount,
+    createAnnouncement,
+    updateAnnouncement,
+    removeAnnouncement,
+    currentAnnouncement,
+    dismissAnnouncement,
     createOrg,
     applyOrg,
     approveApplication,

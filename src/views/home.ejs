@@ -1,6 +1,19 @@
 <%- include('partials/head') %>
 <%- include('partials/header') %>
 <main class="wrap">
+  <% if (announcement) { %>
+    <aside class="announcement" data-announcement="<%= announcement.id %>" aria-label="站內公告">
+      <p>
+        <% if (announcement.title) { %><strong><%= announcement.title %></strong> <% } %><%= announcement.body %>
+      </p>
+      <% if (user) { %>
+        <form method="post" action="/announcements/<%= announcement.id %>/dismiss">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="secondary" type="submit">知道了</button>
+        </form>
+      <% } %>
+    </aside>
+  <% } %>
   <section class="hero">
     <h1>今天可以接的互助</h1>
     <p>食物、交通，或其他需要。你可以寫「我可以提供」，也可以寫「我需要」。標一個功德金額，最後以雙方認定的較低者結算。</p>
