@@ -26,6 +26,7 @@ const versions = {
   '/apple-touch-icon.png': hashFile('apple-touch-icon.png'),
   '/pwa.js': hashFile('pwa.js'),
   '/install.js': hashFile('install.js'),
+  '/large-text.js': hashFile('large-text.js'),
   '/sw-policy.js': hashFile('sw-policy.js'),
   '/offline.html': hashFile('offline.html'),
 };

@@ -5,6 +5,7 @@ const express = require('express');
 const session = require('express-session');
 const { SqliteStore } = require('./sessions');
 const { asset, publicDir, manifestBody, swBody } = require('./assets');
+const { contentSecurityPolicy } = require('./large-text-boot');
 const { AppError } = require('./errors');
 const { cleanPassword } = require('./password');
 const { createServices } = require('./services');
@@ -162,10 +163,7 @@ function createApp(options = {}) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'same-origin');
     res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader(
-      'Content-Security-Policy',
-      "default-src 'self'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
-    );
+    res.setHeader('Content-Security-Policy', contentSecurityPolicy());
     if (!req.session.csrf) req.session.csrf = crypto.randomBytes(16).toString('hex');
     res.locals.csrf = req.session.csrf;
     res.locals.flash = req.session.flash || null;
