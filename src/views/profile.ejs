@@ -42,6 +42,16 @@
       <p class="hint">完成互助之後，這裡會出現徽章。徽章不另發功德。</p>
     <% } %>
   </section>
+  <section class="card" data-completed="<%= profile.milestones.completed %>" data-fives="<%= profile.milestones.fives %>" aria-label="互助里程碑">
+    <h2>互助里程碑</h2>
+    <% profile.milestones.badges.forEach(function (badge) { %>
+      <p class="milestone<%= badge.earned ? ' is-earned' : ' is-locked' %>" data-milestone="<%= badge.id %>" data-earned="<%= badge.earned ? '1' : '0' %>">
+        <span class="tag"><%= badge.label %></span>
+        <%= badge.criterion %>
+        <% if (badge.earned) { %> · 已達成<% } else { %> · 還差 <%= badge.remaining %><%= badge.unit %><% } %>
+      </p>
+    <% }) %>
+  </section>
   <section class="card" data-rating-count="<%= profile.ratingCount %>" data-rating-avg="<%= profile.ratingAvg == null ? '' : profile.ratingAvg %>">
     <h2>星等</h2>
     <% if (profile.ratingCount) { %>

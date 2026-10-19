@@ -53,7 +53,7 @@
     <article class="card<%= item.closed ? ' is-closed' : '' %>">
       <p class="meta">
         <span><%= item.expired ? '已過期' : statusLabel(item.status) %></span>
-        · <%= item.author_name %>
+        · <%= item.author_name %><%- include('partials/mini-badge', { badge: item.author_badge }) %>
       </p>
       <h3><a href="/posts/<%= item.id %>"><%= item.title || item.description.slice(0, 42) %></a></h3>
       <form class="bookmark-form" method="post" action="/posts/<%= item.id %>/bookmark">
@@ -79,8 +79,8 @@
       </p>
       <h3><a href="/posts/<%= post.id %><%= post.task === '待評分' ? '#rate' : '' %>"><%= post.title || post.description.slice(0, 42) %></a></h3>
       <p class="meta">
-        <%= post.author_name %>
-        <% if (post.accepter_name) { %> · <%= post.accepter_name %><% } %>
+        <%= post.author_name %><%- include('partials/mini-badge', { badge: post.author_badge }) %>
+        <% if (post.accepter_name) { %> · <%= post.accepter_name %><%- include('partials/mini-badge', { badge: post.accepter_badge }) %><% } %>
       </p>
       <% if (post.expired) { %>
         <form method="post" action="/posts/<%= post.id %>/repost">

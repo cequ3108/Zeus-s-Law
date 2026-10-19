@@ -199,6 +199,26 @@ button.bookmark.saved svg path { fill: currentColor; }
 .stars { color: #a9742a; letter-spacing: 0.08em; }
 .big-stars { font-size: 1.8rem; margin: 0; }
 
+.mini-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #f4e3a8;
+  color: #3d3208;
+  font-size: 0.75rem;
+  line-height: 1.7;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+.milestone { margin: 8px 0; }
+.milestone.is-earned .tag { background: #f4e3a8; }
+.milestone.is-locked { color: var(--muted); }
+.milestone.is-locked .tag {
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+}
 .tag {
   display: inline-block;
   border-radius: 999px;

@@ -7,6 +7,7 @@ const { cleanPassword, hashPassword, verifyPassword, temporaryPassword } = requi
 const { normalizeCity, cleanDistrict } = require('./places');
 const { TEMPLATES } = require('./templates');
 const { meetingShareText, lineShareUrl } = require('./share');
+const { milestoneBoard } = require('./milestones');
 
 const BANNED_PHRASES = ['現金', '轉帳給我', '匯款', '付錢'];
 
@@ -192,6 +193,17 @@ function createServices(db, options = {}) {
     if (helped >= 5) badges.push('常幫忙');
     if (helped >= 1 && helpedBy >= 1) badges.push('互相往來');
     return { helped, helpedBy, badges, ...ratingSummary(userId) };
+  }
+
+  function milestoneCounts(userId) {
+    const completed = db.prepare(`
+      SELECT COUNT(*) AS count FROM posts
+      WHERE status = 'settled' AND (host_id = ? OR seeker_id = ?)
+    `).get(userId, userId).count;
+    const fives = db.prepare(`
+      SELECT COUNT(*) AS count FROM ratings WHERE ratee_id = ? AND stars = 5
+    `).get(userId).count;
+    return milestoneBoard(completed, fives);
   }
 
   async function requestOtp(rawMobile) {
@@ -841,13 +853,18 @@ function createServices(db, options = {}) {
              u.availability AS author_availability,
              (SELECT ROUND(AVG(stars), 1) FROM ratings WHERE ratee_id = u.id) AS author_avg,
              (SELECT COUNT(*) FROM ratings WHERE ratee_id = u.id) AS author_count,
-             (SELECT COUNT(*) FROM posts WHERE host_id = u.id AND status = 'settled') AS author_helped
+             (SELECT COUNT(*) FROM posts WHERE host_id = u.id AND status = 'settled') AS author_helped,
+             (SELECT COUNT(*) FROM posts c WHERE c.status = 'settled' AND (c.host_id = u.id OR c.seeker_id = u.id)) AS author_completed,
+             (SELECT COUNT(*) FROM ratings fr WHERE fr.ratee_id = u.id AND fr.stars = 5) AS author_fives
       FROM posts p
       JOIN users u ON u.id = p.author_id
       WHERE ${where.join(' AND ')}
       ORDER BY p.id DESC
       LIMIT 50
-    `).all(...params);
+    `).all(...params).map((post) => ({
+      ...post,
+      author_badge: milestoneBoard(post.author_completed, post.author_fives).highest,
+    }));
   }
 
   function taskFor(post, userId) {
@@ -894,6 +911,10 @@ function createServices(db, options = {}) {
              p.settled_amount, p.created_at, p.expires_at, p.author_id,
              p.host_id, p.seeker_id, p.host_value, p.seeker_value,
              a.display_name AS author_name, b.display_name AS accepter_name,
+             (SELECT COUNT(*) FROM posts c WHERE c.status = 'settled' AND (c.host_id = a.id OR c.seeker_id = a.id)) AS author_completed,
+             (SELECT COUNT(*) FROM ratings fr WHERE fr.ratee_id = a.id AND fr.stars = 5) AS author_fives,
+             (SELECT COUNT(*) FROM posts c WHERE b.id IS NOT NULL AND c.status = 'settled' AND (c.host_id = b.id OR c.seeker_id = b.id)) AS accepter_completed,
+             (SELECT COUNT(*) FROM ratings fr WHERE b.id IS NOT NULL AND fr.ratee_id = b.id AND fr.stars = 5) AS accepter_fives,
              EXISTS(SELECT 1 FROM ratings r WHERE r.post_id = p.id AND r.rater_id = ?) AS i_rated
       FROM posts p
       JOIN users a ON a.id = p.author_id
@@ -902,6 +923,10 @@ function createServices(db, options = {}) {
       ORDER BY p.id DESC
     `).all(userId, userId, userId).map((post) => ({
       ...post,
+      author_badge: milestoneBoard(post.author_completed, post.author_fives).highest,
+      accepter_badge: post.accepter_name
+        ? milestoneBoard(post.accepter_completed, post.accepter_fives).highest
+        : '',
       expired: post.status === 'open' && post.expires_at && post.expires_at <= nowIso,
       task: taskFor(post, userId),
     })).sort((a, b) => {
@@ -933,7 +958,14 @@ function createServices(db, options = {}) {
       WHERE r.ratee_id = ?
       ORDER BY r.id DESC
     `).all(userId);
-    return { user, ratings, tags: topRatingTags(userId), reputation: reputation(userId), ...ratingSummary(userId) };
+    return {
+      user,
+      ratings,
+      tags: topRatingTags(userId),
+      reputation: reputation(userId),
+      milestones: milestoneCounts(userId),
+      ...ratingSummary(userId),
+    };
   }
 
   function lineShareFor(viewer, row) {
@@ -1027,17 +1059,24 @@ function createServices(db, options = {}) {
         ratingCount: summary.ratingCount,
         helped: summary.helped,
         badges: summary.badges,
+        badge: milestoneCounts(row.author_id).highest,
       },
       accepter: row.accepter_id
         ? { id: row.accepter_id, name: row.accepter_name, role: row.accepter_role }
         : null,
-      host: host ? { id: host.id, name: host.display_name, role: host.role } : null,
+      host: host ? {
+        id: host.id,
+        name: host.display_name,
+        role: host.role,
+        badge: milestoneCounts(host.id).highest,
+      } : null,
       seeker: seeker
         ? {
           id: seeker.id,
           name: seeker.display_name,
           role: seeker.role,
           merit: isParty && row.status === 'matched' ? seeker.merit : null,
+          badge: milestoneCounts(seeker.id).highest,
         }
         : null,
       isAuthor: !!(viewer && viewer.id === row.author_id),
@@ -1104,7 +1143,9 @@ function createServices(db, options = {}) {
     const nowIso = clock().toISOString();
     return db.prepare(`
       SELECT p.id, p.title, p.description, p.kind, p.status, p.expires_at,
-             u.display_name AS author_name, b.created_at AS saved_at
+             u.display_name AS author_name, b.created_at AS saved_at,
+             (SELECT COUNT(*) FROM posts c WHERE c.status = 'settled' AND (c.host_id = u.id OR c.seeker_id = u.id)) AS author_completed,
+             (SELECT COUNT(*) FROM ratings fr WHERE fr.ratee_id = u.id AND fr.stars = 5) AS author_fives
       FROM bookmarks b
       JOIN posts p ON p.id = b.post_id
       JOIN users u ON u.id = p.author_id
@@ -1119,6 +1160,7 @@ function createServices(db, options = {}) {
       const expired = post.status === 'open' && post.expires_at && post.expires_at <= nowIso;
       return {
         ...post,
+        author_badge: milestoneBoard(post.author_completed, post.author_fives).highest,
         expired,
         closed: expired || post.status === 'cancelled' || post.status === 'settled',
       };
@@ -1318,6 +1360,7 @@ function createServices(db, options = {}) {
     pendingActions,
     getProfile,
     postPage,
+    milestoneCounts,
     toggleBookmark,
     listBookmarks,
     acknowledgeRules,

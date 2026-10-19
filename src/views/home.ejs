@@ -66,7 +66,7 @@
         <h2><a href="/posts/<%= post.id %>"><%= post.title || (kindLabel(post.kind) + ' · ' + categoryLabel(post.category)) %></a></h2>
         <p class="excerpt"><%= post.description %></p>
         <p class="meta">
-          <a href="/users/<%= post.author_id %>"><%= post.author_name %></a>
+          <a href="/users/<%= post.author_id %>"><%= post.author_name %></a><%- include('partials/mini-badge', { badge: post.author_badge }) %>
           · <%= roleLabel(post.author_role) %>
           <% if (post.author_count) { %>
             · <span class="stars"><%= starGlyph(post.author_avg) %></span> <%= post.author_avg %>
