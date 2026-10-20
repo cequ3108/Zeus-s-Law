@@ -23,7 +23,7 @@
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <div class="field">
       <label for="city">我的縣市</label>
-      <select id="city" name="city">
+      <select class="place-select" id="city" name="city">
         <option value="">先不設定</option>
         <% cities.forEach(function (city) { %>
           <option value="<%= city %>" <%= user.city === city ? 'selected' : '' %>><%= city %></option>
@@ -32,8 +32,16 @@
       <p class="hint">設定之後，首頁會先顯示這個縣市。選「全部」仍看得到其他地方，也看得到還沒填縣市的舊貼文。</p>
     </div>
     <div class="field">
-      <label for="district">行政區（可以不填）</label>
-      <input id="district" name="district" maxlength="20" value="<%= user.district || '' %>">
+      <label for="district">鄉鎮市區（可以不填）</label>
+      <%- include('partials/district-select', {
+        id: 'district',
+        cityId: 'city',
+        blank: '可以不填',
+        disabled: !user.city,
+        selectedCity: user.city,
+        selectedDistrict: user.district
+      }) %>
+      <p class="hint">只會顯示縣市和鄉鎮市區，不會留下地址。</p>
     </div>
     <div class="field">
       <label for="availability">今日空檔</label>

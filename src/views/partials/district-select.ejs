@@ -1,0 +1,8 @@
+<select class="place-select" id="<%= id %>" name="district" data-district-for="<%= cityId %>"<% if (disabled) { %> disabled<% } %>>
+  <option value=""><%= blank %></option>
+  <% cities.forEach(function (city) { %>
+    <% (districts[city] || []).forEach(function (name) { %>
+      <option value="<%= name %>" data-city="<%= city %>" <%= selectedCity === city && selectedDistrict === name ? 'selected' : '' %>><%= name %></option>
+    <% }) %>
+  <% }) %>
+</select>

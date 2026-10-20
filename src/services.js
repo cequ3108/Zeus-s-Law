@@ -4,7 +4,7 @@ const { CATEGORIES, ENDOWMENTS, MAX_AMOUNT, RATING_TAGS, MEETING_MODES, PUBLIC_M
 const { taipeiDate, taipeiMonth, taipeiMonthRange, weekRange, lastSeenLabel, LAST_SEEN_INTERVAL_MS } = require('./time');
 const sms = require('./sms');
 const { cleanPassword, hashPassword, verifyPassword, temporaryPassword } = require('./password');
-const { normalizeCity, cleanDistrict } = require('./places');
+const { normalizeCity, normalizeDistrict } = require('./places');
 const { TEMPLATES } = require('./templates');
 const { meetingShareText, lineShareUrl } = require('./share');
 const { milestoneBoard } = require('./milestones');
@@ -471,7 +471,7 @@ function createServices(db, options = {}) {
     const amount = parseAmount(input.amount, '金額', 1);
     assertNoCashLanguage([input.title, description, input.meeting_place, input.meeting_time].join('\n'));
     const city = normalizeCity(input.city);
-    const district = cleanDistrict(input.district);
+    const district = normalizeDistrict(input.district, city);
     const title = cleanTitle(input.title);
     const hours = expiryHours(input.expires_hours);
     const meetingPlace = cleanOptional(input.meeting_place, '地點', 80);
@@ -492,8 +492,7 @@ function createServices(db, options = {}) {
 
   function updateAccountPlace(userId, input) {
     const city = normalizeCity(input.city, { required: false });
-    const district = cleanDistrict(input.district);
-    if (district && !city) throw new AppError('要填行政區，請先選擇縣市。');
+    const district = normalizeDistrict(input.district, city);
     db.prepare('UPDATE users SET city = ?, district = ? WHERE id = ?').run(city, district, userId);
     return mustUser(userId);
   }
@@ -1126,6 +1125,14 @@ function createServices(db, options = {}) {
     if (filter.city) {
       where.push('p.city = ?');
       params.push(filter.city);
+    }
+    if (filter.district) {
+      where.push('p.district = ?');
+      params.push(filter.district);
+    }
+    if (filter.localCity && filter.localDistrict) {
+      where.push('p.city = ? AND p.district = ?');
+      params.push(filter.localCity, filter.localDistrict);
     }
     if (filter.category && CATEGORIES[filter.category]) {
       where.push('p.category = ?');

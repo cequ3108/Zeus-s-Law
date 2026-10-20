@@ -15,7 +15,7 @@ const {
   MEETING_MODES, HOME_VISIT_MODE, HOME_VISIT_NOTE, REPORT_REASONS,
 } = require('./constants');
 const { RULES_HIGHLIGHTS, RULES_PAGE } = require('./rules-copy');
-const { CITIES, normalizeCity } = require('./places');
+const { CITIES, DISTRICTS, normalizeCity, normalizeDistrict, placeLabel } = require('./places');
 const { templatesFor, findTemplate } = require('./templates');
 const { formatMerit, formatTaipei } = require('./time');
 
@@ -129,6 +129,7 @@ function createApp(options = {}) {
     return '★'.repeat(full) + '☆'.repeat(5 - full);
   };
   app.locals.asset = asset;
+  app.locals.placeLabel = placeLabel;
 
   app.get('/manifest.webmanifest', (req, res) => {
     res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
@@ -366,10 +367,25 @@ function createApp(options = {}) {
     const publicMeeting = req.query.public === '1';
     const query = services.cleanSearchQuery(req.query.q);
     const sort = ['amount_desc', 'amount_asc', 'expiry'].includes(req.query.sort) ? req.query.sort : 'new';
+    const mine = res.locals.user && res.locals.user.city && res.locals.user.district
+      ? { city: res.locals.user.city, district: res.locals.user.district }
+      : null;
+    const filterLocal = req.query.local === '1' && !!mine;
+    let district = '';
+    const rawDistrict = Array.isArray(req.query.district) ? req.query.district[0] : req.query.district;
+    if (normalized && rawDistrict) {
+      try {
+        district = normalizeDistrict(rawDistrict, normalized) || '';
+      } catch (err) {
+        if (!(err instanceof AppError)) throw err;
+      }
+    }
     const kept = new URLSearchParams();
     kept.set('city', normalized || 'all');
+    if (district) kept.set('district', district);
     if (category) kept.set('category', category);
     if (publicMeeting) kept.set('public', '1');
+    if (filterLocal) kept.set('local', '1');
     if (sort !== 'new') kept.set('sort', sort);
     const onboarding = res.locals.user ? services.onboardingFor(res.locals.user.id) : null;
     if (onboarding && onboarding.complete) services.dismissOnboarding(res.locals.user.id);
@@ -377,6 +393,9 @@ function createApp(options = {}) {
       title: '廣場',
       posts: services.listOpenPosts({
         city: normalized || null,
+        district: district || null,
+        localCity: filterLocal ? mine.city : null,
+        localDistrict: filterLocal ? mine.district : null,
         category: category || null,
         publicMeeting,
         query,
@@ -384,7 +403,10 @@ function createApp(options = {}) {
         viewerId: res.locals.user && res.locals.user.id,
       }),
       cities: CITIES,
+      districts: DISTRICTS,
       filterCity: normalized || 'all',
+      filterDistrict: district,
+      filterLocal,
       filterCategory: category,
       filterPublic: publicMeeting,
       filterQuery: query,
@@ -644,6 +666,7 @@ function createApp(options = {}) {
     res.render('account', {
       title: '我的帳號',
       cities: CITIES,
+      districts: DISTRICTS,
       week: services.weeklySummary(res.locals.user.id),
     });
   });
@@ -674,6 +697,7 @@ function createApp(options = {}) {
     res.render('post-new', {
       title: '發布',
       cities: CITIES,
+      districts: DISTRICTS,
       templates,
       selected: findTemplate(String(req.query.template || ''), res.locals.user.role),
       hints: ['food', 'transport', 'other'].map((category) => ({

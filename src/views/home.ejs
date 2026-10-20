@@ -60,12 +60,23 @@
     <form class="filter" method="get" action="/">
       <div class="field">
         <label for="filter-city">縣市</label>
-        <select id="filter-city" name="city">
+        <select class="place-select" id="filter-city" name="city">
           <option value="all" <%= filterCity === 'all' ? 'selected' : '' %>>全部</option>
           <% cities.forEach(function (city) { %>
             <option value="<%= city %>" <%= filterCity === city ? 'selected' : '' %>><%= city %></option>
           <% }) %>
         </select>
+      </div>
+      <div class="field">
+        <label for="filter-district">鄉鎮市區</label>
+        <%- include('partials/district-select', {
+          id: 'filter-district',
+          cityId: 'filter-city',
+          blank: '全部',
+          disabled: filterCity === 'all',
+          selectedCity: filterCity,
+          selectedDistrict: filterDistrict
+        }) %>
       </div>
       <div class="field">
         <label for="filter-category">種類</label>
@@ -81,6 +92,12 @@
         <input type="checkbox" name="public" value="1" <%= filterPublic ? 'checked' : '' %>>
         只看公共場所見面
       </label>
+      <% if (user && user.city && user.district) { %>
+        <label class="check filter-local">
+          <input type="checkbox" name="local" value="1" <%= filterLocal ? 'checked' : '' %>>
+          只看我的鄉鎮
+        </label>
+      <% } %>
       <div class="search-bar">
         <div class="field search-field<%= filterQuery ? ' has-clear' : '' %>">
           <label for="q">搜尋</label>
@@ -118,7 +135,7 @@
         <p class="meta">
           <span class="tag tag-<%= post.kind %>"><%= kindLabel(post.kind) %></span>
           <span class="tag"><%= categoryLabel(post.category) %></span>
-          <% if (post.city) { %><span class="tag"><%= post.city %><% if (post.district) { %> <%= post.district %><% } %></span><% } %>
+          <% if (post.city) { %><span class="tag"><%= placeLabel(post.city, post.district) %></span><% } %>
           <% if (post.meeting_mode) { %><span class="tag" data-meeting-mode="<%= post.meeting_mode %>"><%= post.meeting_mode %></span><% } %>
           <span>標示 <%= formatMerit(post.amount) %> 功德</span>
         </p>

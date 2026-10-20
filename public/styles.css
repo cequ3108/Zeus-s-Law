@@ -168,7 +168,8 @@ nav a { color: inherit; }
 .draft-note p { margin: 0; flex: 1 1 12em; }
 .draft-note button { min-height: 44px; min-width: 44px; flex: 0 0 auto; }
 @media (max-width: 560px) {
-  main:has(.announcement) .filter { grid-template-columns: 1fr 1fr auto; }
+  main:has(.announcement) .filter { grid-template-columns: 1fr 1fr; }
+  main:has(.announcement) .filter button { grid-column: 1 / -1; }
   main:has(.announcement) .hero h1 { font-size: 1.45rem; margin: 0.1em 0; }
   main:has(.announcement) .hero > p { margin: 0.2em 0; }
   main:has(.announcement) .announcement { margin-bottom: 8px; padding: 8px 12px; }
@@ -360,11 +361,15 @@ h1 .last-seen { font-size: 0.85rem; }
 .flash-err { background: #fde8e4; color: #6d1a16; }
 
 form { margin: 12px 0 20px; }
-.filter { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; }
+.filter { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 8px; align-items: end; }
 .filter .field { margin: 0; }
-.filter button { margin-bottom: 0; }
-.filter-public { grid-column: 1 / -1; align-items: center; min-height: 44px; margin: 0; }
-.filter-public input { width: 22px; height: 22px; min-height: 22px; margin: 0; flex: 0 0 auto; }
+.filter button { margin-bottom: 0; min-height: 48px; }
+.filter select,
+.place-select { min-height: 48px; }
+.filter-public,
+.filter-local { grid-column: 1 / -1; align-items: center; min-height: 48px; margin: 0; }
+.filter-public input,
+.filter-local input { width: 22px; height: 22px; min-height: 22px; margin: 0; flex: 0 0 auto; }
 .search-bar { grid-column: 1 / -1; display: grid; gap: 8px; }
 .search-field { position: relative; }
 .search-field input { min-height: 44px; }
@@ -390,6 +395,7 @@ form { margin: 12px 0 20px; }
 }
 @media (max-width: 560px) {
   .filter { grid-template-columns: 1fr; }
+  .filter button { width: 100%; }
 }
 .field { margin-bottom: 14px; }
 label, legend { font-weight: 650; }

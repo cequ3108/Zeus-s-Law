@@ -19,6 +19,7 @@ const versions = {
   '/styles.css': hashFile('styles.css'),
   '/favicon.svg': hashFile('favicon.svg'),
   '/draft.js': hashFile('draft.js'),
+  '/districts.js': hashFile('districts.js'),
   '/icon-192.png': hashFile('icon-192.png'),
   '/icon-512.png': hashFile('icon-512.png'),
   '/icon-maskable-192.png': hashFile('icon-maskable-192.png'),

@@ -16,7 +16,7 @@
   <p class="meta">
     <%= roleLabel(profile.user.role) %>
     · 加入於 <%= formatTaipei(profile.user.created_at) %>
-    <% if (profile.user.city) { %> · <%= profile.user.city %><% if (profile.user.district) { %> <%= profile.user.district %><% } %><% } %>
+    <% if (profile.user.city) { %> · <%= placeLabel(profile.user.city, profile.user.district) %><% } %>
     <% if (profile.user.blocked) { %> · 此帳號已被封鎖，不能發布或接下<% } %>
   </p>
   <% if (profile.user.availability) { %>

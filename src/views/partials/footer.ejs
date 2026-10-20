@@ -13,6 +13,9 @@
 <% if ((typeof clearDraft !== 'undefined' && clearDraft) || currentPath === '/posts/new') { %>
 <script src="<%= asset('/draft.js') %>"></script>
 <% } %>
+<% if (currentPath === '/' || currentPath === '/account' || currentPath === '/posts/new') { %>
+<script src="<%= asset('/districts.js') %>"></script>
+<% } %>
 <script src="<%= asset('/pwa.js') %>" data-sw="<%= asset('/sw.js') %>"></script>
 <script src="<%= asset('/large-text.js') %>"></script>
 <% if (currentPath === '/' && ratingReminders && ratingReminders.total) { %>

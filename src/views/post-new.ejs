@@ -47,7 +47,7 @@
       </div>
       <div class="field">
         <label for="city">縣市</label>
-        <select id="city" name="city" required>
+        <select class="place-select" id="city" name="city" required>
           <option value="">請選擇</option>
           <% cities.forEach(function (city) { %>
             <option value="<%= city %>" <%= user.city === city ? 'selected' : '' %>><%= city %></option>
@@ -55,8 +55,15 @@
         </select>
       </div>
       <div class="field">
-        <label for="district">行政區（可以不填）</label>
-        <input id="district" name="district" maxlength="20" value="<%= user.district || '' %>" placeholder="例如 大安區">
+        <label for="district">鄉鎮市區（可以不填）</label>
+        <%- include('partials/district-select', {
+          id: 'district',
+          cityId: 'city',
+          blank: '可以不填',
+          disabled: !user.city,
+          selectedCity: user.city,
+          selectedDistrict: user.district
+        }) %>
       </div>
       <div class="field">
         <label for="amount">標示金額（功德／新台幣）</label>

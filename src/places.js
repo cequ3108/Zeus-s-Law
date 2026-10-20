@@ -6,6 +6,8 @@ const CITIES = [
   '高雄市', '屏東縣', '宜蘭縣', '花蓮縣', '臺東縣', '澎湖縣', '金門縣', '連江縣',
 ];
 
+const DISTRICTS = require('./districts.json');
+
 function normalizeCity(raw, { required = true } = {}) {
   const text = String(raw || '').trim().replace(/台/g, '臺');
   if (!text) {
@@ -16,11 +18,22 @@ function normalizeCity(raw, { required = true } = {}) {
   return text;
 }
 
-function cleanDistrict(raw) {
+function districtsFor(city) {
+  return DISTRICTS[city] ? DISTRICTS[city].slice() : [];
+}
+
+function normalizeDistrict(raw, city) {
   const text = String(raw || '').replace(/[\u0000-\u001F]/g, '').trim().replace(/台/g, '臺');
   if (!text) return null;
-  if ([...text].length > 20) throw new AppError('行政區請不要超過 20 個字。');
+  if (!city) throw new AppError('要填鄉鎮市區，請先選擇縣市。');
+  if (!districtsFor(city).includes(text)) throw new AppError('請選擇這個縣市裡的鄉鎮市區。');
   return text;
 }
 
-module.exports = { CITIES, normalizeCity, cleanDistrict };
+function placeLabel(city, district) {
+  if (!city) return '';
+  if (!district) return city;
+  return `${city}・${district}`;
+}
+
+module.exports = { CITIES, DISTRICTS, districtsFor, normalizeCity, normalizeDistrict, placeLabel };
