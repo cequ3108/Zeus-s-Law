@@ -737,7 +737,58 @@ function createApp(options = {}) {
     const back = `/posts/${req.params.id}`;
     try {
       services.rate(id, res.locals.user.id, req.body.stars, req.body.comment, req.body.tags);
+    } catch (err) {
+      handle(err, req, res, back);
+      return;
+    }
+    const thanks = String(req.body.thanks || '').trim();
+    if (!thanks) {
       redirectWith(req, res, back, { type: 'ok', message: '已送出星等。星等會出現在對方的個人頁，備註不會顯示。' });
+      return;
+    }
+    try {
+      services.saveThanks(id, res.locals.user.id, thanks);
+      redirectWith(req, res, back, { type: 'ok', message: '已送出星等和感謝。感謝會出現在對方的個人頁。' });
+    } catch (err) {
+      if (!(err instanceof AppError)) throw err;
+      redirectWith(req, res, back, {
+        type: 'err',
+        message: `已送出星等。感謝留言沒有留下。${err.message}`,
+      });
+    }
+  });
+
+  app.post('/posts/:id/thanks', requireCsrf, requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    const back = `/posts/${req.params.id}`;
+    try {
+      const saved = services.saveThanks(id, res.locals.user.id, req.body.body);
+      redirectWith(req, res, back, {
+        type: 'ok',
+        message: saved.updated ? '已更新感謝。' : '已留下感謝。',
+      });
+    } catch (err) {
+      handle(err, req, res, back);
+    }
+  });
+
+  app.post('/posts/:id/thanks/delete', requireCsrf, requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    const back = `/posts/${req.params.id}`;
+    try {
+      services.removeOwnThanks(id, res.locals.user.id);
+      redirectWith(req, res, back, { type: 'ok', message: '已刪除感謝。' });
+    } catch (err) {
+      handle(err, req, res, back);
+    }
+  });
+
+  app.post('/thanks/:id/hide', requireCsrf, requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    const back = safeReturn(req.body.return) || '/me';
+    try {
+      services.hideThanks(res.locals.user.id, id);
+      redirectWith(req, res, back, { type: 'ok', message: '這則感謝已不公開。' });
     } catch (err) {
       handle(err, req, res, back);
     }
@@ -821,7 +872,9 @@ function createApp(options = {}) {
 
   app.get('/users/:id', (req, res) => {
     const id = parseId(req.params.id);
-    const profile = id ? services.getProfile(id) : null;
+    const profile = id
+      ? services.getProfile(id, res.locals.user && res.locals.user.id, { all: req.query.thanks === 'all' })
+      : null;
     if (!profile) {
       res.status(404).render('error', { title: '找不到', message: '找不到這位使用者。' });
       return;
@@ -945,6 +998,16 @@ function createApp(options = {}) {
     try {
       const user = services.blockUser(res.locals.user.id, req.body.mobile, req.body.reason);
       redirectWith(req, res, '/admin', { type: 'ok', message: `已封鎖 ${user.display_name}。被封鎖的人不能發布或接下。` });
+    } catch (err) {
+      handle(err, req, res, '/admin');
+    }
+  });
+
+  app.post('/admin/thanks/:id/delete', requireCsrf, requireFounder, (req, res) => {
+    const id = parseId(req.params.id);
+    try {
+      services.deleteThanks(res.locals.user.id, id);
+      redirectWith(req, res, '/admin', { type: 'ok', message: '已刪除這則感謝。' });
     } catch (err) {
       handle(err, req, res, '/admin');
     }

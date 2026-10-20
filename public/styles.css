@@ -461,5 +461,14 @@ html.large-text button.large-text-toggle {
   html.large-text .seal { letter-spacing: 0.06em; padding: 4px 6px; }
   html.large-text .tabbar a { font-size: 0.78rem; padding-left: 2px; padding-right: 2px; }
 }
+.thanks article { margin-top: 12px; }
+.thanks form,
+.thanks-form form { margin: 8px 0; }
+.thanks button,
+.thanks-form button,
+.thanks .button {
+  min-height: 48px;
+  width: 100%;
+}
 .auth-quiet { font-size: 0.82rem; color: var(--muted); }
 .primary-action { display: block; width: 100%; min-height: 52px; font-size: 1.15rem; }

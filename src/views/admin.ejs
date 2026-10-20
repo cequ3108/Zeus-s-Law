@@ -219,6 +219,27 @@
     </form>
   </section>
 
+  <section class="card thanks">
+    <h2>感謝留言</h2>
+    <p class="hint">不當的內容可以刪掉。收到的人自己不公開時，這裡還看得到。</p>
+    <% if (!data.thanks.length) { %><p class="empty">還沒有感謝留言。</p><% } %>
+    <% data.thanks.forEach(function (note) { %>
+      <article data-thanks-id="<%= note.id %>">
+        <p><%= note.body %></p>
+        <p class="meta">
+          <%= formatTaipei(note.created_at) %>
+          · <%= note.author_name %> 給 <%= note.recipient_name %>
+          <% if (note.hidden_at) { %> · 已不公開<% } %>
+          · <a href="/posts/<%= note.post_id %>">互助</a>
+        </p>
+        <form method="post" action="/admin/thanks/<%= note.id %>/delete">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="danger" type="submit">刪除這則感謝</button>
+        </form>
+      </article>
+    <% }) %>
+  </section>
+
   <section class="card">
     <h2>功德帳本</h2>
     <p class="hint">每一筆只追加，不能改、不能刪。這裡只給創辦人看。</p>

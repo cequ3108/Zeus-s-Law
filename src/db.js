@@ -111,6 +111,20 @@ CREATE TABLE IF NOT EXISTS bookmarks (
   PRIMARY KEY (user_id, post_id)
 );
 
+CREATE TABLE IF NOT EXISTS thanks (
+  id INTEGER PRIMARY KEY,
+  post_id INTEGER NOT NULL REFERENCES posts(id),
+  author_id INTEGER NOT NULL REFERENCES users(id),
+  recipient_id INTEGER NOT NULL REFERENCES users(id),
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  hidden_at TEXT,
+  UNIQUE (post_id, author_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_thanks_recipient ON thanks (recipient_id, created_at);
+
 CREATE TABLE IF NOT EXISTS ledger (
   id INTEGER PRIMARY KEY,
   created_at TEXT NOT NULL,
@@ -239,6 +253,18 @@ function migrate(db) {
       created_at TEXT NOT NULL,
       PRIMARY KEY (user_id, post_id)
     );
+    CREATE TABLE IF NOT EXISTS thanks (
+      id INTEGER PRIMARY KEY,
+      post_id INTEGER NOT NULL REFERENCES posts(id),
+      author_id INTEGER NOT NULL REFERENCES users(id),
+      recipient_id INTEGER NOT NULL REFERENCES users(id),
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      hidden_at TEXT,
+      UNIQUE (post_id, author_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_thanks_recipient ON thanks (recipient_id, created_at);
   `);
 }
 

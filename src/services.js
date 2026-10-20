@@ -10,6 +10,11 @@ const { meetingShareText, lineShareUrl } = require('./share');
 const { milestoneBoard } = require('./milestones');
 
 const BANNED_PHRASES = ['現金', '轉帳給我', '匯款', '付錢'];
+const THANK_BANNED = ['現金', '轉帳', '匯款', '付錢', '付現', '紅包', '街口', '微信支付'];
+const THANK_BANNED_LATIN = ['linepay', 'paypal', 'wechatpay', 'applepay'];
+const THANKS_LIMIT = 100;
+const THANKS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const THANKS_EDIT_MS = 24 * 60 * 60 * 1000;
 
 function createServices(db, options = {}) {
   const now = options.now || (() => new Date());
@@ -55,6 +60,15 @@ function createServices(db, options = {}) {
   function assertNoCashLanguage(text) {
     const hit = BANNED_PHRASES.find((phrase) => text.includes(phrase));
     if (hit) throw new AppError(`請不要寫「${hit}」。功德不可購買、兌現或轉售。`);
+  }
+
+  function assertThankYouClean(text) {
+    const hit = THANK_BANNED.find((phrase) => text.includes(phrase));
+    if (hit) throw new AppError(`請不要在感謝留言寫「${hit}」。站內規則禁止現金交易。`);
+    const folded = text.toLowerCase().replace(/\s+/g, '');
+    if (THANK_BANNED_LATIN.some((phrase) => folded.includes(phrase))) {
+      throw new AppError('請不要在感謝留言寫付款方式。站內規則禁止現金交易。');
+    }
   }
 
   function cleanOptional(raw, label, max) {
@@ -610,6 +624,110 @@ function createServices(db, options = {}) {
     }
   }
 
+  function cleanThanks(raw) {
+    const text = String(raw || '').replace(/[\u0000-\u001F]/g, '').trim();
+    if (!text) throw new AppError('感謝留言要寫一些內容。');
+    if ([...text].length > THANKS_LIMIT) throw new AppError('感謝留言請不要超過 100 個字。');
+    assertThankYouClean(text);
+    return text;
+  }
+
+  function stillWithin(iso, windowMs) {
+    const at = new Date(iso).getTime();
+    return Number.isFinite(at) && clock().getTime() <= at + windowMs;
+  }
+
+  function thanksParties(post, authorId) {
+    if (!post || post.status !== 'settled' || !post.settled_at) throw new AppError('結算完成後才能留感謝。');
+    if (authorId !== post.host_id && authorId !== post.seeker_id) {
+      throw new AppError('只有這次互助的雙方可以留感謝。');
+    }
+    const recipientId = authorId === post.host_id ? post.seeker_id : post.host_id;
+    return { recipientId };
+  }
+
+  function saveThanks(postId, authorId, rawBody) {
+    const body = cleanThanks(rawBody);
+    const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
+    const { recipientId } = thanksParties(post, authorId);
+    const existing = db.prepare(
+      'SELECT * FROM thanks WHERE post_id = ? AND author_id = ?'
+    ).get(post.id, authorId);
+    const nowIso = clock().toISOString();
+    if (existing) {
+      if (!stillWithin(existing.created_at, THANKS_EDIT_MS)) {
+        throw new AppError('超過 24 小時就不能再改這則感謝。');
+      }
+      db.prepare('UPDATE thanks SET body = ?, updated_at = ? WHERE id = ?').run(body, nowIso, existing.id);
+      return { id: existing.id, updated: true };
+    }
+    if (!stillWithin(post.settled_at, THANKS_WINDOW_MS)) {
+      throw new AppError('結算超過 7 天就不能再留感謝。');
+    }
+    const info = db.prepare(`
+      INSERT INTO thanks (post_id, author_id, recipient_id, body, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(post.id, authorId, recipientId, body, nowIso, nowIso);
+    return { id: Number(info.lastInsertRowid), updated: false };
+  }
+
+  function removeOwnThanks(postId, authorId) {
+    const existing = db.prepare(
+      'SELECT * FROM thanks WHERE post_id = ? AND author_id = ?'
+    ).get(postId, authorId);
+    if (!existing) throw new AppError('找不到這則感謝。');
+    if (!stillWithin(existing.created_at, THANKS_EDIT_MS)) {
+      throw new AppError('超過 24 小時就不能刪這則感謝。');
+    }
+    db.prepare('DELETE FROM thanks WHERE id = ?').run(existing.id);
+  }
+
+  function hideThanks(actorId, thanksId) {
+    const row = db.prepare('SELECT * FROM thanks WHERE id = ?').get(thanksId);
+    if (!row) throw new AppError('找不到這則感謝。');
+    if (row.recipient_id !== actorId) throw new AppError('只有收到的人可以不公開這則感謝。');
+    if (!row.hidden_at) {
+      db.prepare('UPDATE thanks SET hidden_at = ? WHERE id = ?').run(clock().toISOString(), thanksId);
+    }
+  }
+
+  function deleteThanks(actorId, thanksId) {
+    assertFounder(actorId);
+    const row = db.prepare('SELECT id FROM thanks WHERE id = ?').get(thanksId);
+    if (!row) throw new AppError('找不到這則感謝。');
+    db.prepare('DELETE FROM thanks WHERE id = ?').run(thanksId);
+  }
+
+  function mapThanks(row) {
+    return {
+      id: row.id,
+      postId: row.post_id,
+      body: row.body,
+      createdAt: row.created_at,
+      hidden: !!row.hidden_at,
+      authorId: row.author_id,
+      authorName: row.author_name,
+      category: row.category,
+    };
+  }
+
+  function listReceivedThanks(recipientId, { includeHidden = false, all = false } = {}) {
+    const rows = db.prepare(`
+      SELECT t.id, t.post_id, t.body, t.created_at, t.hidden_at, t.author_id,
+             u.display_name AS author_name, p.category
+      FROM thanks t
+      JOIN users u ON u.id = t.author_id
+      JOIN posts p ON p.id = t.post_id
+      WHERE t.recipient_id = ?
+      ORDER BY t.created_at DESC, t.id DESC
+    `).all(recipientId);
+    const visible = rows.filter((row) => includeHidden || !row.hidden_at);
+    return {
+      notes: (all ? visible : visible.slice(0, 5)).map(mapThanks),
+      noteTotal: visible.length,
+    };
+  }
+
   function topRatingTags(userId) {
     return db.prepare(`
       SELECT t.tag AS tag, COUNT(*) AS count
@@ -945,7 +1063,7 @@ function createServices(db, options = {}) {
     };
   }
 
-  function getProfile(userId) {
+  function getProfile(userId, viewerId, options = {}) {
     const user = db.prepare(`
       SELECT id, display_name, role, blocked, created_at, city, district, availability
       FROM users WHERE id = ?
@@ -958,12 +1076,19 @@ function createServices(db, options = {}) {
       WHERE r.ratee_id = ?
       ORDER BY r.id DESC
     `).all(userId);
+    const thanks = listReceivedThanks(userId, {
+      includeHidden: viewerId === userId,
+      all: options.all === true,
+    });
     return {
       user,
       ratings,
       tags: topRatingTags(userId),
       reputation: reputation(userId),
       milestones: milestoneCounts(userId),
+      notes: thanks.notes,
+      noteTotal: thanks.noteTotal,
+      thanksAll: options.all === true,
       ...ratingSummary(userId),
     };
   }
@@ -1034,6 +1159,17 @@ function createServices(db, options = {}) {
 
     const myRating = viewer && isParty
       ? db.prepare('SELECT stars FROM ratings WHERE post_id = ? AND rater_id = ?').get(row.id, viewer.id)
+      : null;
+    const myThanks = viewer && isParty
+      ? db.prepare('SELECT id, body, created_at FROM thanks WHERE post_id = ? AND author_id = ?').get(row.id, viewer.id)
+      : null;
+    const receivedRow = viewer && isParty
+      ? db.prepare(`
+          SELECT t.id, t.body, t.hidden_at, u.display_name AS author_name
+          FROM thanks t
+          JOIN users u ON u.id = t.author_id
+          WHERE t.post_id = ? AND t.recipient_id = ?
+        `).get(row.id, viewer.id)
       : null;
 
     return {
@@ -1110,6 +1246,15 @@ function createServices(db, options = {}) {
         : null,
       canRate: !!(isParty && settled && !myRating),
       myStars: myRating ? myRating.stars : null,
+      myThanks: myThanks ? { id: myThanks.id, body: myThanks.body } : null,
+      canWriteThanks: !!(isParty && settled && !myThanks && stillWithin(row.settled_at, THANKS_WINDOW_MS)),
+      canEditThanks: !!(myThanks && stillWithin(myThanks.created_at, THANKS_EDIT_MS)),
+      receivedThanks: receivedRow ? {
+        id: receivedRow.id,
+        body: receivedRow.body,
+        authorName: receivedRow.author_name,
+        hidden: !!receivedRow.hidden_at,
+      } : null,
       loggedIn: !!viewer,
       bookmarked: !!(viewer && db.prepare(
         'SELECT 1 FROM bookmarks WHERE user_id = ? AND post_id = ?'
@@ -1395,6 +1540,15 @@ function createServices(db, options = {}) {
       ledger,
       announcements: listAnnouncements(),
       stats: readCommunityStats(),
+      thanks: db.prepare(`
+        SELECT t.id, t.body, t.created_at, t.hidden_at, t.post_id,
+               a.display_name AS author_name, r.display_name AS recipient_name
+        FROM thanks t
+        JOIN users a ON a.id = t.author_id
+        JOIN users r ON r.id = t.recipient_id
+        ORDER BY t.id DESC
+        LIMIT 30
+      `).all(),
     };
   }
 
@@ -1419,6 +1573,10 @@ function createServices(db, options = {}) {
     submitValue,
     retrySettle,
     rate,
+    saveThanks,
+    removeOwnThanks,
+    hideThanks,
+    deleteThanks,
     blockUser,
     unblockUser,
     hideUser,

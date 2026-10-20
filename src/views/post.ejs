@@ -158,11 +158,55 @@
           <textarea id="comment" name="comment" maxlength="500"></textarea>
           <p class="hint">備註只會存進資料庫，不會顯示給任何人，包括你自己。</p>
         </div>
+        <div class="field">
+          <label for="thanks">感謝留言（可不填）</label>
+          <textarea id="thanks" name="thanks" maxlength="100"></textarea>
+          <p class="hint">公開出現在對方的個人頁，最多 100 字。不寫也可以送出星等。結算後 7 天內還可以補寫。</p>
+        </div>
         <button type="submit">送出星等</button>
       </form>
     </section>
   <% } else if (model.myStars) { %>
     <p>你給了對方 <%= model.myStars %> 星。星等顯示在個人頁，備註不會顯示。</p>
+  <% } %>
+
+  <% if (model.canEditThanks || (model.canWriteThanks && !model.canRate)) { %>
+    <section class="card thanks-form">
+      <h2><%= model.canEditThanks ? '修改感謝' : '留一句感謝' %></h2>
+      <form method="post" action="/posts/<%= model.id %>/thanks">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <div class="field">
+          <label for="thanks_body">感謝留言</label>
+          <textarea id="thanks_body" name="body" maxlength="100" required><%= model.myThanks ? model.myThanks.body : '' %></textarea>
+          <p class="hint">最多 100 字，公開出現在對方的個人頁。留下後 24 小時內可以改或刪。</p>
+        </div>
+        <button type="submit"><%= model.canEditThanks ? '更新感謝' : '送出感謝' %></button>
+      </form>
+      <% if (model.canEditThanks) { %>
+        <form method="post" action="/posts/<%= model.id %>/thanks/delete">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="secondary" type="submit">刪除感謝</button>
+        </form>
+      <% } %>
+    </section>
+  <% } else if (model.myThanks) { %>
+    <p>你留了感謝：<%= model.myThanks.body %></p>
+  <% } %>
+
+  <% if (model.receivedThanks) { %>
+    <section class="card thanks">
+      <h2>對方的感謝</h2>
+      <p><%= model.receivedThanks.body %></p>
+      <% if (model.receivedThanks.hidden) { %>
+        <p class="hint">這則已不公開，個人頁不再顯示。</p>
+      <% } else { %>
+        <form method="post" action="/thanks/<%= model.receivedThanks.id %>/hide">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <input type="hidden" name="return" value="/posts/<%= model.id %>">
+          <button class="secondary" type="submit">不公開這則感謝</button>
+        </form>
+      <% } %>
+    </section>
   <% } %>
 </main>
 <%- include('partials/footer') %>

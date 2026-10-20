@@ -68,6 +68,33 @@
       <p>尚無星等。</p>
     <% } %>
   </section>
+  <section class="card thanks" aria-label="收到的感謝" data-thanks="<%= profile.noteTotal %>">
+    <h2>收到的感謝</h2>
+    <% if (!profile.notes.length) { %>
+      <p class="empty">還沒有公開的感謝。</p>
+    <% } %>
+    <% profile.notes.forEach(function (note) { %>
+      <article data-thanks-id="<%= note.id %>" data-hidden="<%= note.hidden ? '1' : '0' %>">
+        <p><%= note.body %></p>
+        <p class="meta">
+          <a href="/users/<%= note.authorId %>"><%= note.authorName %></a>
+          · <%= categoryLabel(note.category) %>
+          · <%= formatTaipei(note.createdAt) %>
+          <% if (note.hidden) { %> · 已不公開<% } %>
+        </p>
+        <% if (own && !note.hidden) { %>
+          <form method="post" action="/thanks/<%= note.id %>/hide">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <input type="hidden" name="return" value="/users/<%= profile.user.id %>">
+            <button class="secondary" type="submit">不公開這則感謝</button>
+          </form>
+        <% } %>
+      </article>
+    <% }) %>
+    <% if (!profile.thanksAll && profile.noteTotal > profile.notes.length) { %>
+      <p><a class="button" href="/users/<%= profile.user.id %>?thanks=all">看更多感謝</a></p>
+    <% } %>
+  </section>
   <% if (profile.ratings.length) { %>
     <h2>收到的星等</h2>
     <% profile.ratings.forEach(function (rating) { %>
