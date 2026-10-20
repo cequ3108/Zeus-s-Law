@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
   district TEXT,
   availability TEXT,
   rules_acknowledged_at TEXT,
+  last_seen_at TEXT,
+  hide_last_seen INTEGER NOT NULL DEFAULT 0 CHECK (hide_last_seen IN (0, 1)),
   created_at TEXT NOT NULL,
   CHECK (merit >= 0),
   CHECK (quota >= 0),
@@ -211,6 +213,8 @@ function migrate(db) {
   addColumn(db, 'users', 'district', 'TEXT');
   addColumn(db, 'users', 'availability', 'TEXT');
   addColumn(db, 'users', 'rules_acknowledged_at', 'TEXT');
+  addColumn(db, 'users', 'last_seen_at', 'TEXT');
+  addColumn(db, 'users', 'hide_last_seen', 'INTEGER NOT NULL DEFAULT 0');
   addColumn(db, 'posts', 'city', 'TEXT');
   addColumn(db, 'posts', 'district', 'TEXT');
   addColumn(db, 'posts', 'title', 'TEXT');

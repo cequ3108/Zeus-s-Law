@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { AppError } = require('./errors');
 const { CATEGORIES, ENDOWMENTS, MAX_AMOUNT, RATING_TAGS, MEETING_MODES, PUBLIC_MEETING_MODES } = require('./constants');
-const { taipeiDate, weekRange } = require('./time');
+const { taipeiDate, weekRange, lastSeenLabel, LAST_SEEN_INTERVAL_MS } = require('./time');
 const sms = require('./sms');
 const { cleanPassword, hashPassword, verifyPassword, temporaryPassword } = require('./password');
 const { normalizeCity, cleanDistrict } = require('./places');
@@ -129,6 +129,35 @@ function createServices(db, options = {}) {
       `).run(clock().toISOString(), user.id);
     }
     return mustUser(user.id);
+  }
+
+  function touchLastSeen(userId, knownAt) {
+    const now = clock();
+    let previous = knownAt;
+    if (previous === undefined) {
+      const row = db.prepare('SELECT last_seen_at FROM users WHERE id = ?').get(userId);
+      if (!row) return;
+      previous = row.last_seen_at;
+    }
+    if (previous) {
+      const then = new Date(previous).getTime();
+      if (!Number.isNaN(then) && now.getTime() - then < LAST_SEEN_INTERVAL_MS) return;
+    }
+    const cutoff = new Date(now.getTime() - LAST_SEEN_INTERVAL_MS).toISOString();
+    db.prepare(`
+      UPDATE users SET last_seen_at = ?
+      WHERE id = ? AND (last_seen_at IS NULL OR last_seen_at <= ?)
+    `).run(now.toISOString(), userId, cutoff);
+  }
+
+  function setHideLastSeen(userId, hide) {
+    db.prepare('UPDATE users SET hide_last_seen = ? WHERE id = ?').run(hide ? 1 : 0, userId);
+  }
+
+  function lastSeenFor(user, viewerId) {
+    if (!user || !user.last_seen_at) return '';
+    if (Number(user.hide_last_seen) === 1 && Number(viewerId) !== Number(user.id)) return '';
+    return lastSeenLabel(user.last_seen_at, clock());
   }
 
   function mustUser(id) {
@@ -982,6 +1011,7 @@ function createServices(db, options = {}) {
              p.meeting_mode,
              u.id AS author_id, u.display_name AS author_name, u.role AS author_role,
              u.availability AS author_availability,
+             u.last_seen_at AS author_last_seen, u.hide_last_seen AS author_hide_last_seen,
              (SELECT ROUND(AVG(stars), 1) FROM ratings WHERE ratee_id = u.id) AS author_avg,
              (SELECT COUNT(*) FROM ratings WHERE ratee_id = u.id) AS author_count,
              (SELECT COUNT(*) FROM posts WHERE host_id = u.id AND status = 'settled') AS author_helped,
@@ -992,10 +1022,20 @@ function createServices(db, options = {}) {
       WHERE ${where.join(' AND ')}
       ORDER BY p.id DESC
       LIMIT 50
-    `).all(...params).map((post) => ({
-      ...post,
-      author_badge: milestoneBoard(post.author_completed, post.author_fives).highest,
-    }));
+    `).all(...params).map((post) => {
+      const authorSeen = lastSeenFor({
+        id: post.author_id,
+        last_seen_at: post.author_last_seen,
+        hide_last_seen: post.author_hide_last_seen,
+      }, filter.viewerId);
+      delete post.author_last_seen;
+      delete post.author_hide_last_seen;
+      return {
+        ...post,
+        author_seen: authorSeen,
+        author_badge: milestoneBoard(post.author_completed, post.author_fives).highest,
+      };
+    });
   }
 
   function taskFor(post, userId) {
@@ -1078,7 +1118,8 @@ function createServices(db, options = {}) {
 
   function getProfile(userId, viewerId, options = {}) {
     const user = db.prepare(`
-      SELECT id, display_name, role, blocked, created_at, city, district, availability
+      SELECT id, display_name, role, blocked, created_at, city, district, availability,
+             last_seen_at, hide_last_seen
       FROM users WHERE id = ?
     `).get(userId);
     if (!user) return null;
@@ -1093,8 +1134,14 @@ function createServices(db, options = {}) {
       includeHidden: viewerId === userId,
       all: options.all === true,
     });
+    const lastSeen = lastSeenFor(user, viewerId);
+    const hideLastSeen = Number(user.hide_last_seen) === 1;
+    delete user.last_seen_at;
+    delete user.hide_last_seen;
     return {
       user,
+      lastSeen,
+      hideLastSeen,
       ratings,
       tags: topRatingTags(userId),
       reputation: reputation(userId),
@@ -1127,6 +1174,7 @@ function createServices(db, options = {}) {
       SELECT p.*,
         a.display_name AS author_name, a.role AS author_role,
         a.blocked AS author_blocked, a.merit AS author_merit, a.availability AS author_availability,
+        a.last_seen_at AS author_last_seen, a.hide_last_seen AS author_hide_last_seen,
         b.display_name AS accepter_name, b.role AS accepter_role
       FROM posts p
       JOIN users a ON a.id = p.author_id
@@ -1140,10 +1188,10 @@ function createServices(db, options = {}) {
     const settled = row.status === 'settled';
     const isParty = !!(viewer && (viewer.id === row.host_id || viewer.id === row.seeker_id));
     const seeker = row.seeker_id
-      ? db.prepare('SELECT id, display_name, role, merit FROM users WHERE id = ?').get(row.seeker_id)
+      ? db.prepare('SELECT id, display_name, role, merit, last_seen_at, hide_last_seen FROM users WHERE id = ?').get(row.seeker_id)
       : null;
     const host = row.host_id
-      ? db.prepare('SELECT id, display_name, role FROM users WHERE id = ?').get(row.host_id)
+      ? db.prepare('SELECT id, display_name, role, last_seen_at, hide_last_seen FROM users WHERE id = ?').get(row.host_id)
       : null;
 
     let canAccept = false;
@@ -1209,6 +1257,11 @@ function createServices(db, options = {}) {
         helped: summary.helped,
         badges: summary.badges,
         badge: milestoneCounts(row.author_id).highest,
+        seen: lastSeenFor({
+          id: row.author_id,
+          last_seen_at: row.author_last_seen,
+          hide_last_seen: row.author_hide_last_seen,
+        }, viewerId),
       },
       accepter: row.accepter_id
         ? { id: row.accepter_id, name: row.accepter_name, role: row.accepter_role }
@@ -1218,6 +1271,7 @@ function createServices(db, options = {}) {
         name: host.display_name,
         role: host.role,
         badge: milestoneCounts(host.id).highest,
+        seen: lastSeenFor(host, viewerId),
       } : null,
       seeker: seeker
         ? {
@@ -1226,6 +1280,7 @@ function createServices(db, options = {}) {
           role: seeker.role,
           merit: isParty && row.status === 'matched' ? seeker.merit : null,
           badge: milestoneCounts(seeker.id).highest,
+          seen: lastSeenFor(seeker, viewerId),
         }
         : null,
       isAuthor: !!(viewer && viewer.id === row.author_id),
@@ -1623,6 +1678,8 @@ function createServices(db, options = {}) {
     adminSnapshot,
     communityStats,
     findByMobile,
+    touchLastSeen,
+    setHideLastSeen,
   };
 }
 

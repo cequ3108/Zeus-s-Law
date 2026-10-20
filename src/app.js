@@ -183,10 +183,11 @@ function createApp(options = {}) {
     if (req.session.userId) {
       res.locals.user = options.db.prepare(`
         SELECT id, mobile, display_name, role, merit, quota, blocked, block_reason, city, district, availability,
-               rules_acknowledged_at
+               rules_acknowledged_at, last_seen_at, hide_last_seen
         FROM users WHERE id = ?
       `).get(req.session.userId) || null;
       if (!res.locals.user) delete req.session.userId;
+      else services.touchLastSeen(res.locals.user.id, res.locals.user.last_seen_at);
     }
     res.locals.actionCount = res.locals.user ? services.pendingActions(res.locals.user.id) : 0;
     res.locals.clearDraft = '';
@@ -408,6 +409,7 @@ function createApp(options = {}) {
       applyRemember(req, remember);
       rememberPhone(req, res, user.mobile, remember);
       req.session.userId = user.id;
+      services.touchLastSeen(user.id);
       redirectWith(req, res, dest, { type: 'ok', message: '已登入。' });
     });
   });
@@ -434,6 +436,7 @@ function createApp(options = {}) {
       );
       rememberPhone(req, res, user.mobile, true);
       req.session.userId = user.id;
+      services.touchLastSeen(user.id);
       const dest = safeReturn(req.session.returnTo) || '/me';
       delete req.session.returnTo;
       redirectWith(req, res, dest, {
@@ -498,6 +501,7 @@ function createApp(options = {}) {
       applyRemember(req, true);
       rememberPhone(req, res, user.mobile, true);
       req.session.userId = user.id;
+      services.touchLastSeen(user.id);
       redirectWith(req, res, '/account', { type: 'ok', message: '密碼已更新。' });
     } catch (err) {
       handle(err, req, res, '/forgot/reset');
@@ -549,6 +553,7 @@ function createApp(options = {}) {
       delete req.session.otpPurpose;
       if (result.user) {
         req.session.userId = result.user.id;
+        services.touchLastSeen(result.user.id);
         const dest = safeReturn(req.session.returnTo) || '/me';
         delete req.session.returnTo;
         redirectWith(req, res, dest, { type: 'ok', message: '已登入。' });
@@ -583,6 +588,7 @@ function createApp(options = {}) {
       const user = services.register(mobile, req.body.display_name);
       delete req.session.verifiedMobile;
       req.session.userId = user.id;
+      services.touchLastSeen(user.id);
       const dest = safeReturn(req.session.returnTo) || '/me';
       delete req.session.returnTo;
       redirectWith(req, res, dest, {
@@ -607,6 +613,16 @@ function createApp(options = {}) {
       title: '我的帳號',
       cities: CITIES,
       week: services.weeklySummary(res.locals.user.id),
+    });
+  });
+
+  app.post('/account/last-seen', requireCsrf, requireLogin, (req, res) => {
+    const hide = req.body.hide_last_seen === '1';
+    services.setHideLastSeen(res.locals.user.id, hide);
+    const back = safeReturn(req.body.return) || '/account';
+    redirectWith(req, res, back, {
+      type: 'ok',
+      message: hide ? '已不對其他人顯示上線狀態。' : '已對其他人顯示上線狀態。',
     });
   });
 

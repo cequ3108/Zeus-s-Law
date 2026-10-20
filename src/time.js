@@ -26,6 +26,22 @@ function formatMerit(value) {
   return new Intl.NumberFormat('zh-TW').format(value);
 }
 
+const LAST_SEEN_INTERVAL_MS = 10 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function lastSeenLabel(iso, now = new Date()) {
+  if (!iso) return '';
+  const seen = new Date(iso);
+  const current = now instanceof Date ? now : new Date(now);
+  if (Number.isNaN(seen.getTime()) || Number.isNaN(current.getTime())) return '';
+  if (taipeiDate(seen) === taipeiDate(current)) return '今天上線';
+  const elapsed = current.getTime() - seen.getTime();
+  if (elapsed < 0) return '今天上線';
+  if (elapsed <= 3 * DAY_MS) return '3天內上線';
+  if (elapsed <= 7 * DAY_MS) return '一週內上線';
+  return '超過一週';
+}
+
 function weekRange(date) {
   const ymd = taipeiDate(date);
   const [year, month, day] = ymd.split('-').map(Number);
@@ -41,4 +57,6 @@ function weekRange(date) {
   return { start: stamp(start), end: stamp(end) };
 }
 
-module.exports = { taipeiDate, formatTaipei, formatMerit, weekRange };
+module.exports = {
+  taipeiDate, formatTaipei, formatMerit, weekRange, lastSeenLabel, LAST_SEEN_INTERVAL_MS,
+};

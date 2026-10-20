@@ -9,6 +9,15 @@
     <p class="hint">字變大、按鈕更好按、對比更高。只存在這支瀏覽器，預設是關的。</p>
     <button type="button" data-large-text="label" aria-pressed="false">開啟大字模式</button>
   </section>
+  <form class="last-seen-form" method="post" action="/account/last-seen">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label class="check" for="hide_last_seen">
+      <input id="hide_last_seen" type="checkbox" name="hide_last_seen" value="1" <%= user.hide_last_seen ? 'checked' : '' %>>
+      不顯示我的上線狀態
+    </label>
+    <p class="hint">開啟後，其他人在廣場、貼文和個人頁看不到你的上線狀態。</p>
+    <button type="submit">儲存</button>
+  </form>
   <form method="post" action="/account">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <div class="field">

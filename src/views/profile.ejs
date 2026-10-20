@@ -1,7 +1,18 @@
 <%- include('partials/head') %>
 <%- include('partials/header') %>
 <main class="wrap">
-  <h1><%= profile.user.display_name %></h1>
+  <h1><%= profile.user.display_name %><%- include('partials/last-seen', { label: profile.lastSeen }) %></h1>
+  <% if (own) { %>
+    <form class="last-seen-form" method="post" action="/account/last-seen">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="return" value="/users/<%= profile.user.id %>">
+      <label class="check" for="hide_last_seen">
+        <input id="hide_last_seen" type="checkbox" name="hide_last_seen" value="1" <%= profile.hideLastSeen ? 'checked' : '' %>>
+        不顯示我的上線狀態
+      </label>
+      <button type="submit">儲存</button>
+    </form>
+  <% } %>
   <p class="meta">
     <%= roleLabel(profile.user.role) %>
     · 加入於 <%= formatTaipei(profile.user.created_at) %>

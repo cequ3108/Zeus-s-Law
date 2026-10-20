@@ -263,6 +263,11 @@ button.bookmark.saved svg path { fill: currentColor; }
   color: var(--ink);
   font-size: 0.86rem;
 }
+.last-seen { color: var(--muted); font-size: 0.78rem; font-weight: 450; margin-left: 6px; white-space: nowrap; }
+h1 .last-seen { font-size: 0.85rem; }
+.last-seen-form { margin: 8px 0 16px; }
+.last-seen-form .check { align-items: center; min-height: 44px; margin: 0 0 8px; }
+.last-seen-form button { min-height: 44px; }
 .tag-need { background: #f3d6d0; color: #6d1a16; }
 .tag-offer { background: #d7eadc; color: var(--good); }
 .tag-task { background: #f4e3a8; color: #3d3208; font-weight: 750; }
