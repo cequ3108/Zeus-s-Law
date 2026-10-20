@@ -13,7 +13,7 @@
   const DELAY = 1000;
   const FIELDS = [
     'kind', 'category', 'title', 'city', 'district', 'amount',
-    'meeting_place', 'meeting_time', 'expires_hours', 'description',
+    'meeting_place', 'meeting_time', 'meeting_mode', 'expires_hours', 'description',
   ];
   const LIMITS = {
     kind: 10,
@@ -24,6 +24,7 @@
     amount: 12,
     meeting_place: 80,
     meeting_time: 80,
+    meeting_mode: 20,
     expires_hours: 3,
     description: 1000,
   };

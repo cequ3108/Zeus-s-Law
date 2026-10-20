@@ -120,6 +120,9 @@ nav a { color: inherit; }
 .draft-note button { min-height: 44px; min-width: 44px; flex: 0 0 auto; }
 @media (max-width: 560px) {
   main:has(.announcement) .filter { grid-template-columns: 1fr 1fr auto; }
+  main:has(.announcement) .hero h1 { font-size: 1.45rem; margin: 0.1em 0; }
+  main:has(.announcement) .hero > p { margin: 0.2em 0; }
+  main:has(.announcement) .announcement { margin-bottom: 8px; padding: 8px 12px; }
 }
 .cash-banner { background: var(--seal); color: #fff8ef; }
 .dev-banner { background: #f4e3a8; color: #3d3208; }
@@ -276,6 +279,8 @@ form { margin: 12px 0 20px; }
 .filter { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; }
 .filter .field { margin: 0; }
 .filter button { margin-bottom: 0; }
+.filter-public { grid-column: 1 / -1; align-items: center; min-height: 44px; margin: 0; }
+.filter-public input { width: 22px; height: 22px; min-height: 22px; margin: 0; flex: 0 0 auto; }
 @media (max-width: 560px) {
   .filter { grid-template-columns: 1fr; }
 }

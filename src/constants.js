@@ -32,6 +32,27 @@ const MAX_AMOUNT = 100_000_000;
 
 const RATING_TAGS = ['準時', '親切', '溝通清楚', '份量實在', '守約', '乾淨整潔'];
 
+const MEETING_MODES = [
+  '超商',
+  '車站或捷運站',
+  '公園或廣場',
+  '公家機關或福利機構',
+  '到府或上門',
+  '線上或不需見面',
+  '其他',
+];
+
+const PUBLIC_MEETING_MODES = [
+  '超商',
+  '車站或捷運站',
+  '公園或廣場',
+  '公家機關或福利機構',
+];
+
+const HOME_VISIT_MODE = '到府或上門';
+
+const HOME_VISIT_NOTE = '建議第一次互助約在公共場所，也可以先看對方的信譽和評價。';
+
 module.exports = {
   ROLES,
   KINDS,
@@ -40,4 +61,8 @@ module.exports = {
   ENDOWMENTS,
   MAX_AMOUNT,
   RATING_TAGS,
+  MEETING_MODES,
+  PUBLIC_MEETING_MODES,
+  HOME_VISIT_MODE,
+  HOME_VISIT_NOTE,
 };

@@ -37,6 +37,10 @@
         </select>
       </div>
       <button type="submit">篩選</button>
+      <label class="check filter-public">
+        <input type="checkbox" name="public" value="1" <%= filterPublic ? 'checked' : '' %>>
+        只看公共場所見面
+      </label>
     </form>
     <% if (!user) { %>
       <p><a class="button" href="/login">用手機號碼加入</a></p>
@@ -57,6 +61,7 @@
           <span class="tag tag-<%= post.kind %>"><%= kindLabel(post.kind) %></span>
           <span class="tag"><%= categoryLabel(post.category) %></span>
           <% if (post.city) { %><span class="tag"><%= post.city %><% if (post.district) { %> <%= post.district %><% } %></span><% } %>
+          <% if (post.meeting_mode) { %><span class="tag" data-meeting-mode="<%= post.meeting_mode %>"><%= post.meeting_mode %></span><% } %>
           <span>標示 <%= formatMerit(post.amount) %> 功德</span>
         </p>
         <% if (user && !user.blocked) { %>

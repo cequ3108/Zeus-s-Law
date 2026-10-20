@@ -72,6 +72,15 @@
         <% }) %>
       </div>
       <div class="field">
+        <label for="meeting_mode">見面方式（可以不選）</label>
+        <select id="meeting_mode" name="meeting_mode">
+          <option value="">可以不選</option>
+          <% meetingModes.forEach(function (mode) { %>
+            <option value="<%= mode %>"><%= mode %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="field">
         <label for="meeting_place">約在哪裡（可以不填）</label>
         <input id="meeting_place" name="meeting_place" maxlength="80" placeholder="例如 公館捷運站 3 號出口">
       </div>

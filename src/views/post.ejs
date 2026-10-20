@@ -5,6 +5,7 @@
     <span class="tag tag-<%= model.kind %>"><%= kindLabel(model.kind) %></span>
     <span class="tag"><%= categoryLabel(model.category) %></span>
     <% if (model.city) { %><span class="tag"><%= model.city %><% if (model.district) { %> <%= model.district %><% } %></span><% } %>
+    <% if (model.meetingMode) { %><span class="tag" data-meeting-mode="<%= model.meetingMode %>"><%= model.meetingMode %></span><% } %>
     <span><%= statusLabel(model.status) %></span>
     <span><%= formatTaipei(model.createdAt) %></span>
   </p>
@@ -39,6 +40,10 @@
 
   <% if (model.expiresAt) { %>
     <p class="meta">招募到 <%= formatTaipei(model.expiresAt) %><% if (model.expired) { %>，已過期，廣場上看不到。<% } %></p>
+  <% } %>
+
+  <% if (model.meetingMode === homeVisitMode) { %>
+    <p class="hint home-visit" data-home-visit><%= homeVisitNote %></p>
   <% } %>
 
   <% if (model.status === 'open') { %>

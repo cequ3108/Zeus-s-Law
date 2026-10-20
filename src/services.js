@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { AppError } = require('./errors');
-const { CATEGORIES, ENDOWMENTS, MAX_AMOUNT, RATING_TAGS } = require('./constants');
+const { CATEGORIES, ENDOWMENTS, MAX_AMOUNT, RATING_TAGS, MEETING_MODES, PUBLIC_MEETING_MODES } = require('./constants');
 const { taipeiDate, weekRange } = require('./time');
 const sms = require('./sms');
 const { cleanPassword, hashPassword, verifyPassword, temporaryPassword } = require('./password');
@@ -75,6 +75,13 @@ function createServices(db, options = {}) {
     const text = String(raw || '').replace(/[\u0000-\u001F]/g, '').trim();
     if (!text) return null;
     if ([...text].length > max) throw new AppError(`${label}請不要超過 ${max} 個字。`);
+    return text;
+  }
+
+  function cleanMeetingMode(raw) {
+    const text = String(raw || '').replace(/[\u0000-\u001F]/g, '').trim();
+    if (!text) return null;
+    if (!MEETING_MODES.includes(text)) throw new AppError('請選擇列出的見面方式，或先不選。');
     return text;
   }
 
@@ -384,15 +391,16 @@ function createServices(db, options = {}) {
     const hours = expiryHours(input.expires_hours);
     const meetingPlace = cleanOptional(input.meeting_place, '地點', 80);
     const meetingTime = cleanOptional(input.meeting_time, '時間', 80);
+    const meetingMode = cleanMeetingMode(input.meeting_mode);
     const info = db.prepare(`
       INSERT INTO posts (
         author_id, kind, category, description, amount, status, created_at,
-        city, district, title, expires_at, meeting_place, meeting_time
+        city, district, title, expires_at, meeting_place, meeting_time, meeting_mode
       )
-      VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       author.id, kind, input.category, description, amount, clock().toISOString(),
-      city, district, title, expiresAt(hours), meetingPlace, meetingTime,
+      city, district, title, expiresAt(hours), meetingPlace, meetingTime, meetingMode,
     );
     return { id: Number(info.lastInsertRowid) };
   }
@@ -462,13 +470,13 @@ function createServices(db, options = {}) {
       const info = db.prepare(`
         INSERT INTO posts (
           author_id, kind, category, description, amount, status, created_at,
-          city, district, title, expires_at, meeting_place, meeting_time
+          city, district, title, expires_at, meeting_place, meeting_time, meeting_mode
         )
-        VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         post.author_id, post.kind, post.category, post.description, post.amount,
         clock().toISOString(), post.city, post.district, post.title, expiresAt(hours),
-        post.meeting_place, post.meeting_time,
+        post.meeting_place, post.meeting_time, post.meeting_mode,
       );
       return { id: Number(info.lastInsertRowid) };
     }).immediate();
@@ -956,6 +964,10 @@ function createServices(db, options = {}) {
       where.push('p.category = ?');
       params.push(filter.category);
     }
+    if (filter.publicMeeting) {
+      where.push(`p.meeting_mode IN (${PUBLIC_MEETING_MODES.map(() => '?').join(', ')})`);
+      params.push(...PUBLIC_MEETING_MODES);
+    }
     if (filter.viewerId) {
       where.push(`NOT EXISTS (
         SELECT 1 FROM user_hides h
@@ -967,6 +979,7 @@ function createServices(db, options = {}) {
     return db.prepare(`
       SELECT EXISTS(SELECT 1 FROM bookmarks b WHERE b.user_id = ? AND b.post_id = p.id) AS bookmarked,
              p.id, p.kind, p.category, p.title, p.description, p.amount, p.created_at, p.city, p.district,
+             p.meeting_mode,
              u.id AS author_id, u.display_name AS author_name, u.role AS author_role,
              u.availability AS author_availability,
              (SELECT ROUND(AVG(stars), 1) FROM ratings WHERE ratee_id = u.id) AS author_avg,
@@ -1241,6 +1254,7 @@ function createServices(db, options = {}) {
       canRetrySettle: !!(isParty && row.status === 'matched' && row.host_value != null && row.seeker_value != null),
       meetingPlace: row.meeting_place,
       meetingTime: row.meeting_time,
+      meetingMode: row.meeting_mode,
       lineShare: isParty && (row.status === 'matched' || settled) && row.host_id && row.seeker_id
         ? lineShareFor(viewer, row)
         : null,

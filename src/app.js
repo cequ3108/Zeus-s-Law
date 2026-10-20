@@ -10,7 +10,10 @@ const { AppError } = require('./errors');
 const { cleanPassword } = require('./password');
 const { createServices } = require('./services');
 const { isDevMode } = require('./sms');
-const { ROLES, KINDS, CATEGORIES, STATUSES, RATING_TAGS } = require('./constants');
+const {
+  ROLES, KINDS, CATEGORIES, STATUSES, RATING_TAGS,
+  MEETING_MODES, HOME_VISIT_MODE, HOME_VISIT_NOTE,
+} = require('./constants');
 const { RULES_HIGHLIGHTS, RULES_PAGE } = require('./rules-copy');
 const { CITIES, normalizeCity } = require('./places');
 const { templatesFor, findTemplate } = require('./templates');
@@ -105,6 +108,9 @@ function createApp(options = {}) {
   app.locals.categoryLabel = (category) => CATEGORIES[category] || category;
   app.locals.statusLabel = (status) => STATUSES[status] || status;
   app.locals.ratingTags = RATING_TAGS;
+  app.locals.meetingModes = MEETING_MODES;
+  app.locals.homeVisitMode = HOME_VISIT_MODE;
+  app.locals.homeVisitNote = HOME_VISIT_NOTE;
   app.locals.rulesHighlights = RULES_HIGHLIGHTS;
   app.locals.rulesPage = RULES_PAGE;
   app.locals.ledgerReason = (reason) => ({
@@ -344,16 +350,19 @@ function createApp(options = {}) {
       }
     }
     const category = CATEGORIES[req.query.category] ? req.query.category : '';
+    const publicMeeting = req.query.public === '1';
     res.render('home', {
       title: '廣場',
       posts: services.listOpenPosts({
         city: normalized || null,
         category: category || null,
+        publicMeeting,
         viewerId: res.locals.user && res.locals.user.id,
       }),
       cities: CITIES,
       filterCity: normalized || 'all',
       filterCategory: category,
+      filterPublic: publicMeeting,
       announcement: services.currentAnnouncement(res.locals.user && res.locals.user.id),
     });
   });

@@ -65,7 +65,8 @@ CREATE TABLE IF NOT EXISTS posts (
   district TEXT,
   expires_at TEXT,
   meeting_place TEXT,
-  meeting_time TEXT
+  meeting_time TEXT,
+  meeting_mode TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_posts_status ON posts (status, id);
@@ -216,6 +217,7 @@ function migrate(db) {
   addColumn(db, 'posts', 'expires_at', 'TEXT');
   addColumn(db, 'posts', 'meeting_place', 'TEXT');
   addColumn(db, 'posts', 'meeting_time', 'TEXT');
+  addColumn(db, 'posts', 'meeting_mode', 'TEXT');
   db.exec(`
     CREATE TABLE IF NOT EXISTS user_hides (
       user_id INTEGER NOT NULL REFERENCES users(id),
