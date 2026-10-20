@@ -59,6 +59,10 @@
         <strong data-stat="pending-orgs"><%= formatMerit(data.stats.pendingOrgs) %></strong>
         <span>待審機構</span>
       </article>
+      <article class="card stat">
+        <strong data-stat="open-reports"><%= formatMerit(data.stats.openReports) %></strong>
+        <span>待處理檢舉數</span>
+      </article>
     </div>
     <h3>招募中的縣市</h3>
     <% if (!data.stats.cities.length) { %>
@@ -69,6 +73,37 @@
         <li data-city="<%= city.city %>" data-count="<%= city.count %>"><%= city.city %> · <%= city.count %></li>
       <% }) %>
     </ol>
+  </section>
+
+  <section aria-label="檢舉">
+    <h2>檢舉</h2>
+    <% if (!data.reports.length) { %><p class="empty">目前沒有待處理的檢舉。</p><% } %>
+    <% data.reports.forEach(function (item) { %>
+      <article class="card" data-report="<%= item.id %>" data-target-count="<%= item.target_count %>">
+        <p>
+          <% if (item.targetHref) { %>
+            <a href="<%= item.targetHref %>"><%= item.targetLabel %></a>
+          <% } else { %><%= item.targetLabel %><% } %>
+          · <%= item.reason %>
+        </p>
+        <% if (item.note) { %><p data-report-note><%= item.note %></p><% } %>
+        <p class="meta">
+          檢舉人 <a href="/users/<%= item.reporter_id %>"><%= item.reporter_name %></a>
+          · <%= formatTaipei(item.created_at) %>
+          · 同一對象共 <%= item.target_count %> 則
+        </p>
+        <div class="report-actions">
+          <form method="post" action="/admin/reports/<%= item.id %>/resolve">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <button type="submit">已處理</button>
+          </form>
+          <form method="post" action="/admin/reports/<%= item.id %>/dismiss">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <button class="secondary" type="submit">駁回</button>
+          </form>
+        </div>
+      </article>
+    <% }) %>
   </section>
 
   <section class="card">

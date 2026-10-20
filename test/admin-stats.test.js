@@ -169,6 +169,7 @@ test('只有創辦人時概況全部是 0', async () => {
     cities: [],
     banned: 0,
     pendingOrgs: 0,
+    openReports: 0,
   });
 
   const app = await listen(env.db);

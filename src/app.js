@@ -12,7 +12,7 @@ const { createServices } = require('./services');
 const { isDevMode } = require('./sms');
 const {
   ROLES, KINDS, CATEGORIES, STATUSES, RATING_TAGS,
-  MEETING_MODES, HOME_VISIT_MODE, HOME_VISIT_NOTE,
+  MEETING_MODES, HOME_VISIT_MODE, HOME_VISIT_NOTE, REPORT_REASONS,
 } = require('./constants');
 const { RULES_HIGHLIGHTS, RULES_PAGE } = require('./rules-copy');
 const { CITIES, normalizeCity } = require('./places');
@@ -111,6 +111,7 @@ function createApp(options = {}) {
   app.locals.meetingModes = MEETING_MODES;
   app.locals.homeVisitMode = HOME_VISIT_MODE;
   app.locals.homeVisitNote = HOME_VISIT_NOTE;
+  app.locals.reportReasons = REPORT_REASONS;
   app.locals.rulesHighlights = RULES_HIGHLIGHTS;
   app.locals.rulesPage = RULES_PAGE;
   app.locals.ledgerReason = (reason) => ({
@@ -193,6 +194,9 @@ function createApp(options = {}) {
     res.locals.ratingReminders = res.locals.user
       ? services.pendingRatings(res.locals.user.id)
       : { total: 0, items: [], day: '' };
+    res.locals.openReports = res.locals.user && res.locals.user.role === 'founder'
+      ? services.openReportCount()
+      : 0;
     res.locals.clearDraft = '';
     if (req.method === 'GET' && req.session.clearDraft) {
       const flag = String(req.session.clearDraft);
@@ -214,6 +218,10 @@ function createApp(options = {}) {
     } catch {
       // 來源不是網址時，改回這個動作對應的頁面。
     }
+    const reportPost = String(req.path || '').match(/^\/posts\/(\d+)\/report$/);
+    if (reportPost) return `/posts/${reportPost[1]}/report`;
+    const reportUser = String(req.path || '').match(/^\/users\/(\d+)\/report$/);
+    if (reportUser) return `/users/${reportUser[1]}/report`;
     const post = String(req.path || '').match(/^\/posts\/(\d+)/);
     if (post) return `/posts/${post[1]}`;
     if (req.path === '/account' || req.path.startsWith('/account/')) return '/account';
@@ -685,6 +693,55 @@ function createApp(options = {}) {
     }
   });
 
+  function renderReport(req, res, targetType) {
+    const id = parseId(req.params.id);
+    if (!id) {
+      res.redirect(targetType === 'post' ? '/' : '/');
+      return;
+    }
+    try {
+      const subject = services.reportForm(res.locals.user.id, targetType, id);
+      if (!subject) {
+        res.status(404).render('error', {
+          title: '找不到',
+          message: targetType === 'post' ? '找不到這則互助。' : '找不到這位會員。',
+        });
+        return;
+      }
+      res.render('report', { title: '檢舉', subject });
+    } catch (err) {
+      if (!(err instanceof AppError)) throw err;
+      const back = targetType === 'post' ? `/posts/${id}` : `/users/${id}`;
+      redirectWith(req, res, back, { type: 'err', message: err.message });
+    }
+  }
+
+  function submitReport(req, res, targetType) {
+    const id = parseId(req.params.id);
+    const form = `/${targetType === 'post' ? 'posts' : 'users'}/${req.params.id}/report`;
+    if (!id) {
+      res.redirect('/');
+      return;
+    }
+    try {
+      services.fileReport(res.locals.user.id, targetType, id, req.body);
+      redirectWith(req, res, targetType === 'post' ? `/posts/${id}` : `/users/${id}`, {
+        type: 'ok',
+        message: '已收到，創辦人會盡快處理',
+      });
+    } catch (err) {
+      handle(err, req, res, form);
+    }
+  }
+
+  app.get('/posts/:id/report', requireLogin, (req, res) => {
+    renderReport(req, res, 'post');
+  });
+
+  app.post('/posts/:id/report', requireLogin, requireCsrf, (req, res) => {
+    submitReport(req, res, 'post');
+  });
+
   app.get('/posts/:id', (req, res) => {
     const id = parseId(req.params.id);
     const model = id ? services.postPage(id, res.locals.user && res.locals.user.id) : null;
@@ -919,6 +976,14 @@ function createApp(options = {}) {
     }
   });
 
+  app.get('/users/:id/report', requireLogin, (req, res) => {
+    renderReport(req, res, 'user');
+  });
+
+  app.post('/users/:id/report', requireLogin, requireCsrf, (req, res) => {
+    submitReport(req, res, 'user');
+  });
+
   app.get('/users/:id', (req, res) => {
     const id = parseId(req.params.id);
     const profile = id
@@ -964,6 +1029,34 @@ function createApp(options = {}) {
 
   app.get('/admin', requireFounder, (req, res) => {
     renderAdmin(req, res);
+  });
+
+  app.post('/admin/reports/:id/resolve', requireCsrf, requireFounder, (req, res) => {
+    const id = parseId(req.params.id);
+    if (!id) {
+      res.redirect('/admin');
+      return;
+    }
+    try {
+      services.handleReport(res.locals.user.id, id, 'resolved');
+      redirectWith(req, res, '/admin', { type: 'ok', message: '已標成處理完。貼文和帳號都沒有自動變動。' });
+    } catch (err) {
+      handle(err, req, res, '/admin');
+    }
+  });
+
+  app.post('/admin/reports/:id/dismiss', requireCsrf, requireFounder, (req, res) => {
+    const id = parseId(req.params.id);
+    if (!id) {
+      res.redirect('/admin');
+      return;
+    }
+    try {
+      services.handleReport(res.locals.user.id, id, 'dismissed');
+      redirectWith(req, res, '/admin', { type: 'ok', message: '已駁回這則檢舉。' });
+    } catch (err) {
+      handle(err, req, res, '/admin');
+    }
   });
 
   app.post('/admin/announcements', requireCsrf, requireFounder, (req, res) => {

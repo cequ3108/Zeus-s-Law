@@ -1,0 +1,23 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap">
+  <h1>檢舉</h1>
+  <p>對象：<a href="<%= subject.href %>"><%= subject.label %></a></p>
+  <p class="hint">創辦人會看到這則檢舉。對方不會知道是誰送出的，其他會員也看不到。</p>
+  <form class="report-form" method="post" action="<%= subject.action %>">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <fieldset class="field">
+      <legend>原因</legend>
+      <% reportReasons.forEach(function (reason) { %>
+        <label class="choice"><input type="radio" name="reason" value="<%= reason %>" required> <%= reason %></label>
+      <% }) %>
+    </fieldset>
+    <div class="field">
+      <label for="note">補充說明（可不填）</label>
+      <textarea id="note" name="note" maxlength="200"></textarea>
+      <p class="hint">最多 200 個字。</p>
+    </div>
+    <button type="submit">送出檢舉</button>
+  </form>
+</main>
+<%- include('partials/footer') %>

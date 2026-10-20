@@ -118,6 +118,9 @@
       </article>
     <% }) %>
   <% } %>
+  <% if (!own) { %>
+    <p class="report-link"><a href="/users/<%= profile.user.id %>/report">檢舉</a></p>
+  <% } %>
   <p><a href="/rules">規則與常見問題</a></p>
 </main>
 <%- include('partials/footer') %>

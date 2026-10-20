@@ -198,6 +198,10 @@
     <p>你留了感謝：<%= model.myThanks.body %></p>
   <% } %>
 
+  <% if (!user || user.id !== model.author.id) { %>
+    <p class="report-link"><a href="/posts/<%= model.id %>/report">檢舉</a></p>
+  <% } %>
+
   <% if (model.receivedThanks) { %>
     <section class="card thanks">
       <h2>對方的感謝</h2>

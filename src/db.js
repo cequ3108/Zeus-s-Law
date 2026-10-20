@@ -162,6 +162,22 @@ CREATE TABLE IF NOT EXISTS user_hides (
 
 CREATE INDEX IF NOT EXISTS idx_user_hides_hidden ON user_hides (hidden_user_id);
 
+CREATE TABLE IF NOT EXISTS reports (
+  id INTEGER PRIMARY KEY,
+  reporter_id INTEGER NOT NULL REFERENCES users(id),
+  target_type TEXT NOT NULL CHECK (target_type IN ('post', 'user')),
+  target_id INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  note TEXT,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'dismissed')),
+  created_at TEXT NOT NULL,
+  handled_at TEXT,
+  handled_by INTEGER REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (status, created_at, id);
+CREATE INDEX IF NOT EXISTS idx_reports_target ON reports (target_type, target_id);
+
 CREATE TABLE IF NOT EXISTS announcements (
   id INTEGER PRIMARY KEY,
   author_id INTEGER NOT NULL REFERENCES users(id),
@@ -273,6 +289,20 @@ function migrate(db) {
       UNIQUE (post_id, author_id)
     );
     CREATE INDEX IF NOT EXISTS idx_thanks_recipient ON thanks (recipient_id, created_at);
+    CREATE TABLE IF NOT EXISTS reports (
+      id INTEGER PRIMARY KEY,
+      reporter_id INTEGER NOT NULL REFERENCES users(id),
+      target_type TEXT NOT NULL CHECK (target_type IN ('post', 'user')),
+      target_id INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      note TEXT,
+      status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'dismissed')),
+      created_at TEXT NOT NULL,
+      handled_at TEXT,
+      handled_by INTEGER REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (status, created_at, id);
+    CREATE INDEX IF NOT EXISTS idx_reports_target ON reports (target_type, target_id);
   `);
 }
 

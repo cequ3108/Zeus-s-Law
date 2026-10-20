@@ -22,6 +22,14 @@ const STATUSES = {
   cancelled: '已取消',
 };
 
+const REPORT_REASONS = [
+  '要求現金或轉帳',
+  '騷擾或不當言行',
+  '不實或可疑內容',
+  '爽約',
+  '其他',
+];
+
 const ENDOWMENTS = {
   user: { merit: 100, quota: 100 },
   org: { merit: 1_000_000, quota: 1_000_000 },
@@ -58,6 +66,7 @@ module.exports = {
   KINDS,
   CATEGORIES,
   STATUSES,
+  REPORT_REASONS,
   ENDOWMENTS,
   MAX_AMOUNT,
   RATING_TAGS,

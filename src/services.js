@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { AppError } = require('./errors');
-const { CATEGORIES, ENDOWMENTS, MAX_AMOUNT, RATING_TAGS, MEETING_MODES, PUBLIC_MEETING_MODES } = require('./constants');
+const { CATEGORIES, ENDOWMENTS, MAX_AMOUNT, RATING_TAGS, MEETING_MODES, PUBLIC_MEETING_MODES, REPORT_REASONS } = require('./constants');
 const { taipeiDate, weekRange, lastSeenLabel, LAST_SEEN_INTERVAL_MS } = require('./time');
 const sms = require('./sms');
 const { cleanPassword, hashPassword, verifyPassword, temporaryPassword } = require('./password');
@@ -14,6 +14,7 @@ const THANK_BANNED = ['現金', '轉帳', '匯款', '付錢', '付現', '紅包'
 const THANK_BANNED_LATIN = ['linepay', 'paypal', 'wechatpay', 'applepay'];
 const THANKS_LIMIT = 100;
 const RATING_REMIND_MS = 14 * 24 * 60 * 60 * 1000;
+const REPORT_WINDOW_MS = 24 * 60 * 60 * 1000;
 const THANKS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const THANKS_EDIT_MS = 24 * 60 * 60 * 1000;
 
@@ -1585,6 +1586,108 @@ function createServices(db, options = {}) {
     });
   }
 
+  function cleanReportNote(raw) {
+    const text = String(raw || '').replace(/[\u0000-\u001F]/g, '').trim();
+    if (!text) return null;
+    if ([...text].length > 200) throw new AppError('補充說明請不要超過 200 個字。');
+    return text;
+  }
+
+  function reportSubject(targetType, targetId) {
+    if (targetType === 'post') {
+      const post = db.prepare('SELECT id, title, description, author_id FROM posts WHERE id = ?').get(targetId);
+      if (!post) return null;
+      return {
+        type: 'post',
+        id: post.id,
+        ownerId: post.author_id,
+        label: post.title || String(post.description || '').slice(0, 42),
+        href: `/posts/${post.id}`,
+        action: `/posts/${post.id}/report`,
+      };
+    }
+    if (targetType === 'user') {
+      const user = db.prepare('SELECT id, display_name FROM users WHERE id = ?').get(targetId);
+      if (!user) return null;
+      return {
+        type: 'user',
+        id: user.id,
+        ownerId: user.id,
+        label: user.display_name,
+        href: `/users/${user.id}`,
+        action: `/users/${user.id}/report`,
+      };
+    }
+    return null;
+  }
+
+  function reportForm(reporterId, targetType, targetId) {
+    const reporter = mustUser(reporterId);
+    const subject = reportSubject(targetType, targetId);
+    if (!subject) return null;
+    if (subject.ownerId === reporter.id) {
+      throw new AppError(subject.type === 'post' ? '不能檢舉自己的貼文。' : '不能檢舉自己。');
+    }
+    return subject;
+  }
+
+  function fileReport(reporterId, targetType, targetId, input) {
+    const subject = reportForm(reporterId, targetType, targetId);
+    if (!subject) throw new AppError(targetType === 'post' ? '找不到這則互助。' : '找不到這位會員。');
+    const reason = String(input && input.reason || '').trim();
+    if (!REPORT_REASONS.includes(reason)) throw new AppError('請選擇列出的原因。');
+    const note = cleanReportNote(input && input.note);
+    const since = new Date(clock().getTime() - REPORT_WINDOW_MS).toISOString();
+    const recent = db.prepare(`
+      SELECT 1 FROM reports
+      WHERE reporter_id = ? AND target_type = ? AND target_id = ? AND created_at > ?
+      LIMIT 1
+    `).get(reporterId, subject.type, subject.id, since);
+    if (recent) throw new AppError('你已經檢舉過了，請 24 小時後再送。');
+    const info = db.prepare(`
+      INSERT INTO reports (reporter_id, target_type, target_id, reason, note, status, created_at)
+      VALUES (?, ?, ?, ?, ?, 'open', ?)
+    `).run(reporterId, subject.type, subject.id, reason, note, clock().toISOString());
+    return { id: Number(info.lastInsertRowid) };
+  }
+
+  function openReportCount() {
+    return db.prepare(`SELECT COUNT(*) AS n FROM reports WHERE status = 'open'`).get().n;
+  }
+
+  function listOpenReports() {
+    return db.prepare(`
+      SELECT r.id, r.target_type, r.target_id, r.reason, r.note, r.created_at,
+             reporter.display_name AS reporter_name, reporter.id AS reporter_id,
+             (
+               SELECT COUNT(*) FROM reports c
+               WHERE c.target_type = r.target_type AND c.target_id = r.target_id
+             ) AS target_count
+      FROM reports r
+      JOIN users reporter ON reporter.id = r.reporter_id
+      WHERE r.status = 'open'
+      ORDER BY r.created_at DESC, r.id DESC
+    `).all().map((row) => {
+      const subject = reportSubject(row.target_type, row.target_id);
+      return {
+        ...row,
+        targetLabel: subject ? subject.label : (row.target_type === 'post' ? '這則貼文已不存在' : '這位會員已不存在'),
+        targetHref: subject ? subject.href : '',
+      };
+    });
+  }
+
+  function handleReport(actorId, reportId, status) {
+    const actor = assertFounder(actorId);
+    if (status !== 'resolved' && status !== 'dismissed') throw new AppError('無法處理這則檢舉。');
+    const changed = db.prepare(`
+      UPDATE reports
+      SET status = ?, handled_at = ?, handled_by = ?
+      WHERE id = ? AND status = 'open'
+    `).run(status, clock().toISOString(), actor.id, reportId);
+    if (changed.changes !== 1) throw new AppError('這則檢舉已經處理過了。');
+  }
+
   // 含剛好 7 天前的那一刻，更早的不算。只讀，不寫入。
   function readCommunityStats() {
     const nowIso = clock().toISOString();
@@ -1654,6 +1757,7 @@ function createServices(db, options = {}) {
       cities,
       banned,
       pendingOrgs,
+      openReports: openReportCount(),
     };
   }
 
@@ -1711,6 +1815,7 @@ function createServices(db, options = {}) {
       lookup,
       ledger,
       announcements: listAnnouncements(),
+      reports: listOpenReports(),
       stats: readCommunityStats(),
       thanks: db.prepare(`
         SELECT t.id, t.body, t.created_at, t.hidden_at, t.post_id,
@@ -1784,6 +1889,11 @@ function createServices(db, options = {}) {
     dismissOnboarding,
     adminSnapshot,
     communityStats,
+    reportForm,
+    fileReport,
+    openReportCount,
+    listOpenReports,
+    handleReport,
     findByMobile,
     touchLastSeen,
     setHideLastSeen,
