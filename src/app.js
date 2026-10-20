@@ -352,18 +352,30 @@ function createApp(options = {}) {
     }
     const category = CATEGORIES[req.query.category] ? req.query.category : '';
     const publicMeeting = req.query.public === '1';
+    const query = services.cleanSearchQuery(req.query.q);
+    const sort = ['amount_desc', 'amount_asc', 'expiry'].includes(req.query.sort) ? req.query.sort : 'new';
+    const kept = new URLSearchParams();
+    kept.set('city', normalized || 'all');
+    if (category) kept.set('category', category);
+    if (publicMeeting) kept.set('public', '1');
+    if (sort !== 'new') kept.set('sort', sort);
     res.render('home', {
       title: '廣場',
       posts: services.listOpenPosts({
         city: normalized || null,
         category: category || null,
         publicMeeting,
+        query,
+        sort,
         viewerId: res.locals.user && res.locals.user.id,
       }),
       cities: CITIES,
       filterCity: normalized || 'all',
       filterCategory: category,
       filterPublic: publicMeeting,
+      filterQuery: query,
+      filterSort: sort,
+      searchClearPath: `/?${kept.toString()}`,
       announcement: services.currentAnnouncement(res.locals.user && res.locals.user.id),
     });
   });

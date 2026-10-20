@@ -41,6 +41,22 @@
         <input type="checkbox" name="public" value="1" <%= filterPublic ? 'checked' : '' %>>
         只看公共場所見面
       </label>
+      <div class="search-bar">
+        <div class="field search-field<%= filterQuery ? ' has-clear' : '' %>">
+          <label for="q">搜尋</label>
+          <input id="q" name="q" value="<%= filterQuery %>" maxlength="40" placeholder="搜尋便當、共乘、陪看病…" autocomplete="off">
+          <% if (filterQuery) { %><a class="search-clear" href="<%= searchClearPath %>">清除</a><% } %>
+        </div>
+        <div class="field">
+          <label for="filter-sort">排序</label>
+          <select id="filter-sort" name="sort">
+            <option value="new" <%= filterSort === 'new' ? 'selected' : '' %>>最新發布</option>
+            <option value="amount_desc" <%= filterSort === 'amount_desc' ? 'selected' : '' %>>功德由高到低</option>
+            <option value="amount_asc" <%= filterSort === 'amount_asc' ? 'selected' : '' %>>功德由低到高</option>
+            <option value="expiry" <%= filterSort === 'expiry' ? 'selected' : '' %>>快到期優先</option>
+          </select>
+        </div>
+      </div>
     </form>
     <% if (!user) { %>
       <p><a class="button" href="/login">用手機號碼加入</a></p>
@@ -49,7 +65,9 @@
     <% } %>
   </section>
 
-  <% if (!posts.length) { %>
+  <% if (!posts.length && filterQuery) { %>
+    <p class="empty">找不到相符的貼文，換個關鍵字試試</p>
+  <% } else if (!posts.length) { %>
     <p class="empty">廣場還沒有招募中的貼文。</p>
   <% } %>
 

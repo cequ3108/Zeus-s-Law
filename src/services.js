@@ -982,6 +982,17 @@ function createServices(db, options = {}) {
     return { ...range, spent, received, quotaGained };
   }
 
+  function cleanSearchQuery(raw) {
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    const text = String(value || '').replace(/[\u0000-\u001F]/g, '').trim();
+    if (!text) return '';
+    return [...text].slice(0, 40).join('');
+  }
+
+  function likeContains(text) {
+    return `%${text.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+  }
+
   function listOpenPosts(filter = {}) {
     const where = ['p.status = \'open\'', 'u.blocked = 0', '(p.expires_at IS NULL OR p.expires_at > ?)'];
     const params = [filter.viewerId || 0, clock().toISOString()];
@@ -996,6 +1007,12 @@ function createServices(db, options = {}) {
     if (filter.publicMeeting) {
       where.push(`p.meeting_mode IN (${PUBLIC_MEETING_MODES.map(() => '?').join(', ')})`);
       params.push(...PUBLIC_MEETING_MODES);
+    }
+    const query = cleanSearchQuery(filter.query);
+    if (query) {
+      const pattern = likeContains(query);
+      where.push(`(IFNULL(p.title, '') LIKE ? ESCAPE '\\' OR p.description LIKE ? ESCAPE '\\')`);
+      params.push(pattern, pattern);
     }
     if (filter.viewerId) {
       where.push(`NOT EXISTS (
@@ -1020,7 +1037,11 @@ function createServices(db, options = {}) {
       FROM posts p
       JOIN users u ON u.id = p.author_id
       WHERE ${where.join(' AND ')}
-      ORDER BY p.id DESC
+      ORDER BY ${({
+        amount_desc: 'p.amount DESC, p.id DESC',
+        amount_asc: 'p.amount ASC, p.id DESC',
+        expiry: '(p.expires_at IS NULL), p.expires_at ASC, p.id DESC',
+      })[filter.sort] || 'p.id DESC'}
       LIMIT 50
     `).all(...params).map((post) => {
       const authorSeen = lastSeenFor({
@@ -1665,6 +1686,7 @@ function createServices(db, options = {}) {
     rejectApplication,
     latestApplication,
     listOpenPosts,
+    cleanSearchQuery,
     priceHint,
     weeklySummary,
     dashboard,
