@@ -129,6 +129,29 @@ nav a { color: inherit; }
 .onboarding form { margin: 4px 0 0; }
 .onboarding button { width: 100%; min-height: 48px; }
 .onboarding p { margin: 0; min-height: 48px; display: flex; align-items: center; }
+.rating-remind {
+  margin: 0 0 12px;
+  padding: 8px 12px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.rating-remind[hidden] { display: none; }
+.rating-remind p { margin: 0; }
+.rating-remind ol { margin: 8px 0; padding: 0; list-style: none; }
+.rating-remind li { margin: 0; }
+.rating-remind a,
+.rating-due a {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-height: 48px;
+}
+.rating-remind .button,
+.rating-remind button { width: 100%; min-height: 48px; }
+.rating-due { margin: 0 0 16px; padding: 0; list-style: none; }
+.rating-due li { margin: 0; border-bottom: 1px solid var(--line); }
 .draft-note {
   display: flex;
   flex-wrap: wrap;
@@ -150,6 +173,7 @@ nav a { color: inherit; }
   main:has(.announcement) .hero > p { margin: 0.2em 0; }
   main:has(.announcement) .announcement { margin-bottom: 8px; padding: 8px 12px; }
   main:has(.announcement) .onboarding { margin-bottom: 8px; padding-bottom: 8px; }
+  main:has(.announcement) .rating-remind { margin-bottom: 8px; padding-bottom: 8px; }
 }
 .cash-banner { background: var(--seal); color: #fff8ef; }
 .dev-banner { background: #f4e3a8; color: #3d3208; }
@@ -419,6 +443,7 @@ button + button, form + form { margin-top: 8px; }
   font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
 }
 .tabbar a {
+  position: relative;
   color: var(--muted);
   text-decoration: none;
   text-align: center;
@@ -427,6 +452,21 @@ button + button, form + form { margin-top: 8px; }
   font-size: 0.86rem;
 }
 .tabbar a.active { color: var(--ink); font-weight: 750; }
+.tab-badge {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--seal);
+  color: #fff8ef;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
 
 :focus-visible { outline: 2px solid var(--bronze); outline-offset: 2px; }
 

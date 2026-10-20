@@ -31,6 +31,17 @@
     <p><a class="button" href="/posts/new">發布一則</a></p>
   <% } %>
 
+  <% if (ratingReminders && ratingReminders.total) { %>
+    <h2 id="pending-ratings">待評分</h2>
+    <ol class="rating-due" data-rating-due-list="<%= ratingReminders.total %>">
+      <% ratingReminders.items.forEach(function (item) { %>
+        <li>
+          <a href="<%= item.href %>"><%= item.otherName %> · <%= item.title %> · <%= formatTaipei(item.settledAt) %></a>
+        </li>
+      <% }) %>
+    </ol>
+  <% } %>
+
   <h2>我封鎖的人</h2>
   <% if (!dash.hidden.length) { %>
     <p class="empty">目前沒有。</p>

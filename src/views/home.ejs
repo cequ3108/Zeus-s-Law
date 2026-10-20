@@ -14,6 +14,26 @@
       <% } %>
     </aside>
   <% } %>
+  <% if (ratingReminders && ratingReminders.total) { %>
+    <aside class="rating-remind" data-rating-remind="<%= ratingReminders.total %>" data-remind-user="<%= user.id %>" data-remind-day="<%= ratingReminders.day %>">
+      <p>你有 <%= ratingReminders.total %> 筆互助還沒給對方評分</p>
+      <ol>
+        <% ratingReminders.items.slice(0, 3).forEach(function (item) { %>
+          <li>
+            <a href="<%= item.href %>">
+              <span><%= item.otherName %></span>
+              <span><%= item.title %></span>
+              <time datetime="<%= item.settledAt %>"><%= formatTaipei(item.settledAt) %></time>
+            </a>
+          </li>
+        <% }) %>
+      </ol>
+      <% if (ratingReminders.total > 3) { %>
+        <p><a class="button" href="/me#pending-ratings">查看全部</a></p>
+      <% } %>
+      <button type="button" data-remind-dismiss>稍後再說</button>
+    </aside>
+  <% } %>
   <% if (onboarding) { %>
     <details class="onboarding" open data-onboarding="<%= onboarding.complete ? 'complete' : onboarding.done + '/' + onboarding.total %>">
       <summary>新手上手 <%= onboarding.done %>/<%= onboarding.total %></summary>

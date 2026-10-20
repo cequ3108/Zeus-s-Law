@@ -27,6 +27,7 @@ const versions = {
   '/pwa.js': hashFile('pwa.js'),
   '/install.js': hashFile('install.js'),
   '/large-text.js': hashFile('large-text.js'),
+  '/rating-remind.js': hashFile('rating-remind.js'),
   '/sw-policy.js': hashFile('sw-policy.js'),
   '/offline.html': hashFile('offline.html'),
 };

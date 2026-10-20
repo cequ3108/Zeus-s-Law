@@ -13,6 +13,7 @@ const BANNED_PHRASES = ['現金', '轉帳給我', '匯款', '付錢'];
 const THANK_BANNED = ['現金', '轉帳', '匯款', '付錢', '付現', '紅包', '街口', '微信支付'];
 const THANK_BANNED_LATIN = ['linepay', 'paypal', 'wechatpay', 'applepay'];
 const THANKS_LIMIT = 100;
+const RATING_REMIND_MS = 14 * 24 * 60 * 60 * 1000;
 const THANKS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const THANKS_EDIT_MS = 24 * 60 * 60 * 1000;
 
@@ -1149,6 +1150,33 @@ function createServices(db, options = {}) {
     `).get(userId, userId, userId, userId, userId).count;
   }
 
+  function pendingRatings(userId) {
+    const since = new Date(clock().getTime() - RATING_REMIND_MS).toISOString();
+    const rows = db.prepare(`
+      SELECT p.id, p.title, p.description, p.settled_at,
+             CASE WHEN p.host_id = ? THEN seeker.display_name ELSE host.display_name END AS other_name
+      FROM posts p
+      JOIN users host ON host.id = p.host_id
+      JOIN users seeker ON seeker.id = p.seeker_id
+      WHERE p.status = 'settled'
+        AND p.settled_at IS NOT NULL
+        AND p.settled_at >= ?
+        AND (p.host_id = ? OR p.seeker_id = ?)
+        AND NOT EXISTS (
+          SELECT 1 FROM ratings r WHERE r.post_id = p.id AND r.rater_id = ?
+        )
+      ORDER BY p.settled_at DESC, p.id DESC
+    `).all(userId, since, userId, userId, userId);
+    const items = rows.map((row) => ({
+      id: row.id,
+      title: row.title || String(row.description || '').slice(0, 42),
+      otherName: row.other_name,
+      settledAt: row.settled_at,
+      href: `/posts/${row.id}#rate`,
+    }));
+    return { total: items.length, items, day: taipeiDate(clock()) };
+  }
+
   function dashboard(userId) {
     const user = mustUser(userId);
     const nowIso = clock().toISOString();
@@ -1745,6 +1773,7 @@ function createServices(db, options = {}) {
     weeklySummary,
     dashboard,
     pendingActions,
+    pendingRatings,
     getProfile,
     postPage,
     milestoneCounts,

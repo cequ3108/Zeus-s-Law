@@ -190,6 +190,9 @@ function createApp(options = {}) {
       else services.touchLastSeen(res.locals.user.id, res.locals.user.last_seen_at);
     }
     res.locals.actionCount = res.locals.user ? services.pendingActions(res.locals.user.id) : 0;
+    res.locals.ratingReminders = res.locals.user
+      ? services.pendingRatings(res.locals.user.id)
+      : { total: 0, items: [], day: '' };
     res.locals.clearDraft = '';
     if (req.method === 'GET' && req.session.clearDraft) {
       const flag = String(req.session.clearDraft);
