@@ -131,6 +131,60 @@ function createServices(db, options = {}) {
     return mustUser(user.id);
   }
 
+  function onboardingFor(userId) {
+    const user = db.prepare(`
+      SELECT id, display_name, availability, city, rules_acknowledged_at, onboarding_dismissed_at
+      FROM users WHERE id = ?
+    `).get(userId);
+    if (!user || user.onboarding_dismissed_at) return null;
+    const veteran = db.prepare(`
+      SELECT 1 FROM posts
+      WHERE status = 'settled' AND (host_id = ? OR seeker_id = ?)
+      LIMIT 1
+    `).get(userId, userId);
+    if (veteran) return null;
+    const acted = db.prepare(`
+      SELECT 1 FROM posts WHERE author_id = ? OR accepter_id = ? LIMIT 1
+    `).get(userId, userId);
+    const named = String(user.display_name || '').trim();
+    const intro = String(user.availability || '').trim();
+    const steps = [
+      {
+        id: 'profile',
+        label: '填好暱稱和自我介紹',
+        href: '/account',
+        done: named.length > 0 && intro.length > 0,
+      },
+      {
+        id: 'city',
+        label: '選好縣市',
+        href: '/account',
+        done: String(user.city || '').trim().length > 0,
+      },
+      {
+        id: 'rules',
+        label: '看過規則',
+        href: '/rules',
+        done: !!user.rules_acknowledged_at,
+      },
+      {
+        id: 'start',
+        label: '發布一則，或接下別人的互助',
+        href: '/posts/new',
+        done: !!acted,
+      },
+    ];
+    const done = steps.filter((step) => step.done).length;
+    return { steps, done, total: steps.length, complete: done === steps.length };
+  }
+
+  function dismissOnboarding(userId) {
+    db.prepare(`
+      UPDATE users SET onboarding_dismissed_at = ?
+      WHERE id = ? AND onboarding_dismissed_at IS NULL
+    `).run(clock().toISOString(), userId);
+  }
+
   function touchLastSeen(userId, knownAt) {
     const now = clock();
     let previous = knownAt;
@@ -1697,6 +1751,8 @@ function createServices(db, options = {}) {
     toggleBookmark,
     listBookmarks,
     acknowledgeRules,
+    onboardingFor,
+    dismissOnboarding,
     adminSnapshot,
     communityStats,
     findByMobile,

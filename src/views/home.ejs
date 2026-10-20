@@ -14,6 +14,26 @@
       <% } %>
     </aside>
   <% } %>
+  <% if (onboarding) { %>
+    <details class="onboarding" open data-onboarding="<%= onboarding.complete ? 'complete' : onboarding.done + '/' + onboarding.total %>">
+      <summary>新手上手 <%= onboarding.done %>/<%= onboarding.total %></summary>
+      <% if (onboarding.complete) { %>
+        <p>完成！</p>
+      <% } else { %>
+        <ol>
+          <% onboarding.steps.forEach(function (step) { %>
+            <li class="<%= step.done ? 'is-done' : '' %>" data-step="<%= step.id %>" data-done="<%= step.done ? '1' : '0' %>">
+              <a href="<%= step.href %>"><%= step.label %></a>
+            </li>
+          <% }) %>
+        </ol>
+        <form method="post" action="/onboarding/dismiss">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="secondary" type="submit">先不要顯示</button>
+        </form>
+      <% } %>
+    </details>
+  <% } %>
   <section class="hero">
     <h1>今天可以接的互助</h1>
     <p>食物、交通，或其他需要。你可以寫「我可以提供」，也可以寫「我需要」。標一個功德金額，最後以雙方認定的較低者結算。</p>

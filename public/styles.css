@@ -103,6 +103,32 @@ nav a { color: inherit; }
 }
 .announcement form { margin: 0; }
 .announcement button { min-height: 44px; min-width: 44px; }
+.onboarding {
+  margin: 0 0 12px;
+  padding: 4px 12px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.onboarding summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  font-weight: 650;
+  cursor: pointer;
+}
+.onboarding ol { margin: 0; padding-left: 1.2em; }
+.onboarding li { margin: 0; }
+.onboarding a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+}
+.onboarding li.is-done,
+.onboarding li.is-done a { color: var(--muted); }
+.onboarding form { margin: 4px 0 0; }
+.onboarding button { width: 100%; min-height: 48px; }
+.onboarding p { margin: 0; min-height: 48px; display: flex; align-items: center; }
 .draft-note {
   display: flex;
   flex-wrap: wrap;
@@ -123,6 +149,7 @@ nav a { color: inherit; }
   main:has(.announcement) .hero h1 { font-size: 1.45rem; margin: 0.1em 0; }
   main:has(.announcement) .hero > p { margin: 0.2em 0; }
   main:has(.announcement) .announcement { margin-bottom: 8px; padding: 8px 12px; }
+  main:has(.announcement) .onboarding { margin-bottom: 8px; padding-bottom: 8px; }
 }
 .cash-banner { background: var(--seal); color: #fff8ef; }
 .dev-banner { background: #f4e3a8; color: #3d3208; }

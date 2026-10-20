@@ -223,6 +223,7 @@ function createApp(options = {}) {
     if (req.path.startsWith('/org')) return '/org/apply';
     if (req.path === '/posts' || req.path === '/posts/new') return '/posts/new';
     if (req.path === '/rules/ack') return safeReturn(req.body && req.body.return) || '/me';
+    if (req.path === '/onboarding/dismiss') return '/';
     if (req.path === '/forgot' || req.path === '/forgot/reset') return '/forgot';
     if (req.path === '/login/code' || req.path === '/verify') return '/login/code';
     if (req.path === '/join' || req.path === '/register') return '/join';
@@ -359,6 +360,8 @@ function createApp(options = {}) {
     if (category) kept.set('category', category);
     if (publicMeeting) kept.set('public', '1');
     if (sort !== 'new') kept.set('sort', sort);
+    const onboarding = res.locals.user ? services.onboardingFor(res.locals.user.id) : null;
+    if (onboarding && onboarding.complete) services.dismissOnboarding(res.locals.user.id);
     res.render('home', {
       title: '廣場',
       posts: services.listOpenPosts({
@@ -377,7 +380,13 @@ function createApp(options = {}) {
       filterSort: sort,
       searchClearPath: `/?${kept.toString()}`,
       announcement: services.currentAnnouncement(res.locals.user && res.locals.user.id),
+      onboarding,
     });
+  });
+
+  app.post('/onboarding/dismiss', requireCsrf, requireLogin, (req, res) => {
+    services.dismissOnboarding(res.locals.user.id);
+    res.redirect('/');
   });
 
   app.get('/rules', (req, res) => {
