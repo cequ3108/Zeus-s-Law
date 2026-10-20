@@ -984,6 +984,19 @@ function createApp(options = {}) {
     submitReport(req, res, 'user');
   });
 
+  app.get('/users/:id/merit', requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    if (!id || id !== res.locals.user.id) {
+      res.status(403).render('error', { title: '沒有權限', message: '只能看自己的功德明細。' });
+      return;
+    }
+    const history = services.meritHistory(res.locals.user.id, {
+      month: req.query.month,
+      before: parseId(req.query.before),
+    });
+    res.render('merit', { title: '我的功德明細', history });
+  });
+
   app.get('/users/:id', (req, res) => {
     const id = parseId(req.params.id);
     const profile = id

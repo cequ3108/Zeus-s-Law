@@ -7,6 +7,20 @@ function taipeiDate(date) {
   }).format(date);
 }
 
+function taipeiMonth(date) {
+  return taipeiDate(date instanceof Date ? date : new Date(date)).slice(0, 7);
+}
+
+function taipeiMonthRange(yearMonth) {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(String(yearMonth || ''));
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const start = new Date(Date.UTC(year, month - 1, 1) - 8 * 60 * 60 * 1000);
+  const end = new Date(Date.UTC(year, month, 1) - 8 * 60 * 60 * 1000);
+  return { month: `${match[1]}-${match[2]}`, start: start.toISOString(), end: end.toISOString() };
+}
+
 function formatTaipei(iso) {
   if (!iso) return '';
   const date = new Date(iso);
@@ -58,5 +72,5 @@ function weekRange(date) {
 }
 
 module.exports = {
-  taipeiDate, formatTaipei, formatMerit, weekRange, lastSeenLabel, LAST_SEEN_INTERVAL_MS,
+  taipeiDate, taipeiMonth, taipeiMonthRange, formatTaipei, formatMerit, weekRange, lastSeenLabel, LAST_SEEN_INTERVAL_MS,
 };

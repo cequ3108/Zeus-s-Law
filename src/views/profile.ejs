@@ -36,7 +36,7 @@
       </article>
       <article class="card balance">
         <p>功德</p>
-        <strong data-merit="<%= own.merit %>"><%= formatMerit(own.merit) %></strong>
+        <strong data-merit="<%= own.merit %>"><a href="/users/<%= profile.user.id %>/merit"><%= formatMerit(own.merit) %></a></strong>
       </article>
     </section>
   <% } %>

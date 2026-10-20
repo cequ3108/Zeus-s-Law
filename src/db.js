@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS ledger (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ledger_user ON ledger (user_id, id);
+CREATE INDEX IF NOT EXISTS idx_ledger_user_time ON ledger (user_id, created_at, id);
 
 CREATE TABLE IF NOT EXISTS sessions (
   sid TEXT PRIMARY KEY,
@@ -303,6 +304,7 @@ function migrate(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (status, created_at, id);
     CREATE INDEX IF NOT EXISTS idx_reports_target ON reports (target_type, target_id);
+    CREATE INDEX IF NOT EXISTS idx_ledger_user_time ON ledger (user_id, created_at, id);
   `);
 }
 

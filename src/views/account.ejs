@@ -3,6 +3,7 @@
 <main class="wrap narrow">
   <h1>我的帳號</h1>
   <p class="meta"><%= user.display_name %> · <%= roleLabel(user.role) %></p>
+  <p class="merit-entry"><a href="/users/<%= user.id %>/merit">功德 <%= formatMerit(user.merit) %></a></p>
   <p>手機 <strong><%= user.mobile %></strong> 只在帳號頁顯示，公開個人頁看不到。</p>
   <section class="card" aria-label="大字模式">
     <h2>大字模式</h2>

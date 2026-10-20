@@ -274,6 +274,34 @@ button.bookmark.saved svg path { fill: currentColor; }
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
 }
+.balance a,
+.merit-entry a {
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  min-width: 48px;
+}
+.merit-filter { display: flex; gap: 8px; align-items: flex-end; margin: 12px 0; }
+.merit-filter .field { flex: 1 1 auto; margin: 0; min-width: 0; }
+.merit-filter select,
+.merit-filter button { min-height: 48px; }
+.merit-filter button { flex: 0 0 auto; }
+.merit-list { list-style: none; margin: 12px 0; padding: 0; }
+.merit-list li {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.merit-list p { margin: 0.15em 0; }
+.merit-list a { display: inline-flex; align-items: center; min-height: 48px; }
+.delta { font-weight: 700; font-variant-numeric: tabular-nums; }
+.delta.is-plus { color: #146b32; }
+.delta.is-minus { color: var(--seal); }
+.merit-more { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; }
 .meta, .hint, .empty { color: var(--muted); }
 .excerpt, .description { white-space: pre-wrap; }
 .excerpt {

@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { AppError } = require('./errors');
 const { CATEGORIES, ENDOWMENTS, MAX_AMOUNT, RATING_TAGS, MEETING_MODES, PUBLIC_MEETING_MODES, REPORT_REASONS } = require('./constants');
-const { taipeiDate, weekRange, lastSeenLabel, LAST_SEEN_INTERVAL_MS } = require('./time');
+const { taipeiDate, taipeiMonth, taipeiMonthRange, weekRange, lastSeenLabel, LAST_SEEN_INTERVAL_MS } = require('./time');
 const sms = require('./sms');
 const { cleanPassword, hashPassword, verifyPassword, temporaryPassword } = require('./password');
 const { normalizeCity, cleanDistrict } = require('./places');
@@ -1017,6 +1017,77 @@ function createServices(db, options = {}) {
     };
   }
 
+  const MERIT_PAGE = 20;
+  const MERIT_TYPES = {
+    signup: '註冊起始',
+    settle_receive: '招待別人收到',
+    settle_spend: '被招待付出',
+    founder_seed: '創辦人或機構發放',
+    founder_endow: '創辦人或機構發放',
+    org_create: '創辦人或機構發放',
+    org_endow: '創辦人或機構發放',
+  };
+
+  function meritHistory(userId, options = {}) {
+    const user = mustUser(userId);
+    const bounds = taipeiMonthRange(options.month);
+    const before = Number.isInteger(options.before) && options.before > 0 ? options.before : null;
+    const where = ['l.user_id = ?'];
+    const params = [user.id];
+    if (bounds) {
+      where.push('l.created_at >= ? AND l.created_at < ?');
+      params.push(bounds.start, bounds.end);
+    }
+    if (before) {
+      where.push('l.id < ?');
+      params.push(before);
+    }
+    const rows = db.prepare(`
+      SELECT l.id, l.created_at, l.delta_merit, l.delta_quota, l.merit_after, l.reason,
+             l.counterparty_id, c.display_name AS counterparty_name
+      FROM ledger l
+      LEFT JOIN users c ON c.id = l.counterparty_id
+      WHERE ${where.join(' AND ')}
+      ORDER BY l.id DESC
+      LIMIT ?
+    `).all(...params, MERIT_PAGE + 1);
+    const hasMore = rows.length > MERIT_PAGE;
+    const items = rows.slice(0, MERIT_PAGE).map((row) => ({
+      id: row.id,
+      at: row.created_at,
+      type: MERIT_TYPES[row.reason] || '其他',
+      reason: row.reason,
+      deltaMerit: row.delta_merit,
+      deltaQuota: row.delta_quota,
+      meritAfter: row.merit_after,
+      counterpartyId: row.counterparty_id,
+      counterpartyName: row.counterparty_name || '',
+    }));
+    const current = taipeiMonthRange(taipeiMonth(clock()));
+    const sums = db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN reason = 'settle_receive' AND delta_merit > 0 THEN delta_merit ELSE 0 END), 0) AS received,
+        COALESCE(SUM(CASE WHEN reason = 'settle_spend' AND delta_merit < 0 THEN -delta_merit ELSE 0 END), 0) AS paid
+      FROM ledger
+      WHERE user_id = ? AND created_at >= ? AND created_at < ?
+    `).get(user.id, current.start, current.end);
+    const months = [...new Set(
+      db.prepare('SELECT created_at FROM ledger WHERE user_id = ?').all(user.id)
+        .map((row) => taipeiMonth(row.created_at)),
+    )].sort().reverse();
+    return {
+      merit: user.merit,
+      quota: user.quota,
+      received: sums.received,
+      paid: sums.paid,
+      month: bounds ? bounds.month : '',
+      months,
+      items,
+      hasMore,
+      nextBefore: hasMore ? items[items.length - 1].id : null,
+    };
+  }
+
   function weeklySummary(userId) {
     const range = weekRange(clock());
     const spent = db.prepare(`
@@ -1876,6 +1947,7 @@ function createServices(db, options = {}) {
     cleanSearchQuery,
     priceHint,
     weeklySummary,
+    meritHistory,
     dashboard,
     pendingActions,
     pendingRatings,
