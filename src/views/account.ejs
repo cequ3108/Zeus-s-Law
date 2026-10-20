@@ -43,6 +43,11 @@
       }) %>
       <p class="hint">只會顯示縣市和鄉鎮市區，不會留下地址。</p>
     </div>
+    <%- include('partials/slot-picks', {
+      legend: '方便互助時段（可以不選）',
+      picked: parseSlots(user.slots),
+      hint: '跟今日空檔分開。只記方便的時段，可以不選，也不會留下地址。'
+    }) %>
     <div class="field">
       <label for="availability">今日空檔</label>
       <input id="availability" name="availability" maxlength="80" value="<%= user.availability || '' %>" placeholder="例如 今天 14:00–18:00 可以">

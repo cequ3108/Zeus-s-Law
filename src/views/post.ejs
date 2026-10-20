@@ -6,6 +6,7 @@
     <span class="tag"><%= categoryLabel(model.category) %></span>
     <% if (model.city) { %><span class="tag"><%= placeLabel(model.city, model.district) %></span><% } %>
     <% if (model.meetingMode) { %><span class="tag" data-meeting-mode="<%= model.meetingMode %>"><%= model.meetingMode %></span><% } %>
+    <%- include('partials/slot-tags', { value: model.slots }) %>
     <span><%= statusLabel(model.status) %></span>
     <span><%= formatTaipei(model.createdAt) %></span>
   </p>
@@ -20,7 +21,7 @@
   <p class="description"><%= model.description %></p>
   <p class="meta">
     發布者
-    <a href="/users/<%= model.author.id %>"><%= model.author.name %></a><%- include('partials/mini-badge', { badge: model.author.badge }) %><%- include('partials/last-seen', { label: model.author.seen }) %>
+    <a href="/users/<%= model.author.id %>"><%= model.author.name %></a><%- include('partials/slot-tags', { value: model.author.slots }) %><%- include('partials/mini-badge', { badge: model.author.badge }) %><%- include('partials/last-seen', { label: model.author.seen }) %>
     · <%= roleLabel(model.author.role) %>
     <% if (model.author.ratingCount) { %>
       · <span class="stars"><%= starGlyph(model.author.ratingAvg) %></span> <%= model.author.ratingAvg %>
@@ -74,8 +75,8 @@
   <% if (model.host && model.seeker) { %>
     <section class="card">
       <h2>雙方</h2>
-      <p>提供幫助的人（收入功德）：<a href="/users/<%= model.host.id %>"><%= model.host.name %></a><%- include('partials/mini-badge', { badge: model.host.badge }) %><%- include('partials/last-seen', { label: model.host.seen }) %> · <%= roleLabel(model.host.role) %></p>
-      <p>接受幫助的人（支出功德）：<a href="/users/<%= model.seeker.id %>"><%= model.seeker.name %></a><%- include('partials/mini-badge', { badge: model.seeker.badge }) %><%- include('partials/last-seen', { label: model.seeker.seen }) %> · <%= roleLabel(model.seeker.role) %></p>
+      <p>提供幫助的人（收入功德）：<a href="/users/<%= model.host.id %>"><%= model.host.name %></a><%- include('partials/slot-tags', { value: model.host.slots }) %><%- include('partials/mini-badge', { badge: model.host.badge }) %><%- include('partials/last-seen', { label: model.host.seen }) %> · <%= roleLabel(model.host.role) %></p>
+      <p>接受幫助的人（支出功德）：<a href="/users/<%= model.seeker.id %>"><%= model.seeker.name %></a><%- include('partials/slot-tags', { value: model.seeker.slots }) %><%- include('partials/mini-badge', { badge: model.seeker.badge }) %><%- include('partials/last-seen', { label: model.seeker.seen }) %> · <%= roleLabel(model.seeker.role) %></p>
       <% if (model.kind === 'need' && model.author.role === 'org') { %>
         <p class="hint">這則是福利機構的需要。功德由機構付出，幫忙的人獲得。</p>
       <% } %>

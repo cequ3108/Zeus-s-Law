@@ -5,6 +5,7 @@ const { taipeiDate, taipeiMonth, taipeiMonthRange, weekRange, lastSeenLabel, LAS
 const sms = require('./sms');
 const { cleanPassword, hashPassword, verifyPassword, temporaryPassword } = require('./password');
 const { normalizeCity, normalizeDistrict } = require('./places');
+const { normalizeSlots } = require('./slots');
 const { TEMPLATES } = require('./templates');
 const { meetingShareText, lineShareUrl } = require('./share');
 const { milestoneBoard } = require('./milestones');
@@ -477,15 +478,16 @@ function createServices(db, options = {}) {
     const meetingPlace = cleanOptional(input.meeting_place, '地點', 80);
     const meetingTime = cleanOptional(input.meeting_time, '時間', 80);
     const meetingMode = cleanMeetingMode(input.meeting_mode);
+    const slots = normalizeSlots(input.slots);
     const info = db.prepare(`
       INSERT INTO posts (
         author_id, kind, category, description, amount, status, created_at,
-        city, district, title, expires_at, meeting_place, meeting_time, meeting_mode
+        city, district, title, expires_at, meeting_place, meeting_time, meeting_mode, slots
       )
-      VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       author.id, kind, input.category, description, amount, clock().toISOString(),
-      city, district, title, expiresAt(hours), meetingPlace, meetingTime, meetingMode,
+      city, district, title, expiresAt(hours), meetingPlace, meetingTime, meetingMode, slots,
     );
     return { id: Number(info.lastInsertRowid) };
   }
@@ -500,6 +502,12 @@ function createServices(db, options = {}) {
   function updateAvailability(userId, raw) {
     const text = cleanOptional(raw, '今日空檔', 80);
     db.prepare('UPDATE users SET availability = ? WHERE id = ?').run(text, userId);
+    return mustUser(userId);
+  }
+
+  function updateSlots(userId, raw) {
+    const slots = normalizeSlots(raw);
+    db.prepare('UPDATE users SET slots = ? WHERE id = ?').run(slots, userId);
     return mustUser(userId);
   }
 
@@ -554,13 +562,13 @@ function createServices(db, options = {}) {
       const info = db.prepare(`
         INSERT INTO posts (
           author_id, kind, category, description, amount, status, created_at,
-          city, district, title, expires_at, meeting_place, meeting_time, meeting_mode
+          city, district, title, expires_at, meeting_place, meeting_time, meeting_mode, slots
         )
-        VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         post.author_id, post.kind, post.category, post.description, post.amount,
         clock().toISOString(), post.city, post.district, post.title, expiresAt(hours),
-        post.meeting_place, post.meeting_time, post.meeting_mode,
+        post.meeting_place, post.meeting_time, post.meeting_mode, post.slots,
       );
       return { id: Number(info.lastInsertRowid) };
     }).immediate();
@@ -1134,6 +1142,14 @@ function createServices(db, options = {}) {
       where.push('p.city = ? AND p.district = ?');
       params.push(filter.localCity, filter.localDistrict);
     }
+    if (Array.isArray(filter.fitSlots) && filter.fitSlots.length) {
+      const parts = ['p.slots IS NULL', "p.slots = ''"];
+      for (const slot of filter.fitSlots) {
+        parts.push(`(',' || IFNULL(p.slots, '') || ',') LIKE ? ESCAPE '\\'`);
+        params.push(`%,${String(slot).replace(/[\\%_]/g, (ch) => `\\${ch}`)},%`);
+      }
+      where.push(`(${parts.join(' OR ')})`);
+    }
     if (filter.category && CATEGORIES[filter.category]) {
       where.push('p.category = ?');
       params.push(filter.category);
@@ -1159,7 +1175,7 @@ function createServices(db, options = {}) {
     return db.prepare(`
       SELECT EXISTS(SELECT 1 FROM bookmarks b WHERE b.user_id = ? AND b.post_id = p.id) AS bookmarked,
              p.id, p.kind, p.category, p.title, p.description, p.amount, p.created_at, p.city, p.district,
-             p.meeting_mode,
+             p.meeting_mode, p.slots,
              u.id AS author_id, u.display_name AS author_name, u.role AS author_role,
              u.availability AS author_availability,
              u.last_seen_at AS author_last_seen, u.hide_last_seen AS author_hide_last_seen,
@@ -1300,7 +1316,7 @@ function createServices(db, options = {}) {
 
   function getProfile(userId, viewerId, options = {}) {
     const user = db.prepare(`
-      SELECT id, display_name, role, blocked, created_at, city, district, availability,
+      SELECT id, display_name, role, blocked, created_at, city, district, availability, slots,
              last_seen_at, hide_last_seen
       FROM users WHERE id = ?
     `).get(userId);
@@ -1356,6 +1372,7 @@ function createServices(db, options = {}) {
       SELECT p.*,
         a.display_name AS author_name, a.role AS author_role,
         a.blocked AS author_blocked, a.merit AS author_merit, a.availability AS author_availability,
+        a.slots AS author_slots,
         a.last_seen_at AS author_last_seen, a.hide_last_seen AS author_hide_last_seen,
         b.display_name AS accepter_name, b.role AS accepter_role
       FROM posts p
@@ -1370,10 +1387,10 @@ function createServices(db, options = {}) {
     const settled = row.status === 'settled';
     const isParty = !!(viewer && (viewer.id === row.host_id || viewer.id === row.seeker_id));
     const seeker = row.seeker_id
-      ? db.prepare('SELECT id, display_name, role, merit, last_seen_at, hide_last_seen FROM users WHERE id = ?').get(row.seeker_id)
+      ? db.prepare('SELECT id, display_name, role, merit, slots, last_seen_at, hide_last_seen FROM users WHERE id = ?').get(row.seeker_id)
       : null;
     const host = row.host_id
-      ? db.prepare('SELECT id, display_name, role, last_seen_at, hide_last_seen FROM users WHERE id = ?').get(row.host_id)
+      ? db.prepare('SELECT id, display_name, role, slots, last_seen_at, hide_last_seen FROM users WHERE id = ?').get(row.host_id)
       : null;
 
     let canAccept = false;
@@ -1434,6 +1451,7 @@ function createServices(db, options = {}) {
         role: row.author_role,
         blocked: row.author_blocked === 1,
         availability: row.author_availability,
+        slots: row.author_slots,
         ratingAvg: summary.ratingAvg,
         ratingCount: summary.ratingCount,
         helped: summary.helped,
@@ -1453,6 +1471,7 @@ function createServices(db, options = {}) {
         name: host.display_name,
         role: host.role,
         badge: milestoneCounts(host.id).highest,
+        slots: host.slots,
         seen: lastSeenFor(host, viewerId),
       } : null,
       seeker: seeker
@@ -1461,6 +1480,7 @@ function createServices(db, options = {}) {
           name: seeker.display_name,
           role: seeker.role,
           merit: isParty && row.status === 'matched' ? seeker.merit : null,
+          slots: seeker.slots,
           badge: milestoneCounts(seeker.id).highest,
           seen: lastSeenFor(seeker, viewerId),
         }
@@ -1492,6 +1512,7 @@ function createServices(db, options = {}) {
       meetingPlace: row.meeting_place,
       meetingTime: row.meeting_time,
       meetingMode: row.meeting_mode,
+      slots: row.slots,
       lineShare: isParty && (row.status === 'matched' || settled) && row.host_id && row.seeker_id
         ? lineShareFor(viewer, row)
         : null,
@@ -1922,6 +1943,7 @@ function createServices(db, options = {}) {
     createPost,
     updateAccountPlace,
     updateAvailability,
+    updateSlots,
     acceptPost,
     repostPost,
     cancelPost,

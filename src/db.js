@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
   city TEXT,
   district TEXT,
   availability TEXT,
+  slots TEXT,
   rules_acknowledged_at TEXT,
   last_seen_at TEXT,
   hide_last_seen INTEGER NOT NULL DEFAULT 0 CHECK (hide_last_seen IN (0, 1)),
@@ -69,7 +70,8 @@ CREATE TABLE IF NOT EXISTS posts (
   expires_at TEXT,
   meeting_place TEXT,
   meeting_time TEXT,
-  meeting_mode TEXT
+  meeting_mode TEXT,
+  slots TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_posts_status ON posts (status, id);
@@ -230,6 +232,7 @@ function migrate(db) {
   addColumn(db, 'users', 'city', 'TEXT');
   addColumn(db, 'users', 'district', 'TEXT');
   addColumn(db, 'users', 'availability', 'TEXT');
+  addColumn(db, 'users', 'slots', 'TEXT');
   addColumn(db, 'users', 'rules_acknowledged_at', 'TEXT');
   addColumn(db, 'users', 'last_seen_at', 'TEXT');
   addColumn(db, 'users', 'hide_last_seen', 'INTEGER NOT NULL DEFAULT 0');
@@ -241,6 +244,7 @@ function migrate(db) {
   addColumn(db, 'posts', 'meeting_place', 'TEXT');
   addColumn(db, 'posts', 'meeting_time', 'TEXT');
   addColumn(db, 'posts', 'meeting_mode', 'TEXT');
+  addColumn(db, 'posts', 'slots', 'TEXT');
   db.exec(`
     CREATE TABLE IF NOT EXISTS user_hides (
       user_id INTEGER NOT NULL REFERENCES users(id),

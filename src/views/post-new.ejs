@@ -65,6 +65,11 @@
           selectedDistrict: user.district
         }) %>
       </div>
+      <%- include('partials/slot-picks', {
+        legend: '希望時段（可以不選）',
+        picked: parseSlots(user.slots),
+        hint: '先帶入你帳號上的方便時段。這則可以改，也可以全部取消。'
+      }) %>
       <div class="field">
         <label for="amount">標示金額（功德／新台幣）</label>
         <input id="amount" name="amount" inputmode="numeric" min="1" step="1" required placeholder="<%= selected ? '建議 ' + selected.min + '–' + selected.max : '' %>">

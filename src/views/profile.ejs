@@ -22,6 +22,9 @@
   <% if (profile.user.availability) { %>
     <p>今日空檔：<%= profile.user.availability %></p>
   <% } %>
+  <% if (parseSlots(profile.user.slots).length) { %>
+    <p class="slot-line">方便互助時段 <%- include('partials/slot-tags', { value: profile.user.slots }) %></p>
+  <% } %>
   <% if (canHide) { %>
     <form class="hide-form" method="post" action="/users/<%= profile.user.id %>/hide">
       <input type="hidden" name="_csrf" value="<%= csrf %>">

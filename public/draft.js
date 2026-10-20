@@ -12,7 +12,7 @@
   const PREFIX = 'zeus-post-draft:';
   const DELAY = 1000;
   const FIELDS = [
-    'kind', 'category', 'title', 'city', 'district', 'amount',
+    'kind', 'category', 'title', 'city', 'district', 'slots', 'amount',
     'meeting_place', 'meeting_time', 'meeting_mode', 'expires_hours', 'description',
   ];
   const LIMITS = {
@@ -21,6 +21,7 @@
     title: 40,
     city: 20,
     district: 20,
+    slots: 40,
     amount: 12,
     meeting_place: 80,
     meeting_time: 80,
@@ -88,13 +89,37 @@
     }
   }
 
+  function checkboxValues(element) {
+    if (!element) return null;
+    if (element.type === 'checkbox') return element.checked ? element.value : '';
+    if (typeof element.length === 'number' && element[0] && element[0].type === 'checkbox') {
+      const picked = [];
+      for (let i = 0; i < element.length; i += 1) {
+        if (element[i].checked) picked.push(element[i].value);
+      }
+      return picked.join(',');
+    }
+    return null;
+  }
+
   function readField(element) {
+    const boxes = checkboxValues(element);
+    if (boxes != null) return boxes;
     if (!element || typeof element.value !== 'string') return '';
     return element.value;
   }
 
   function writeField(element, value) {
     if (!element || element.type === 'hidden') return;
+    if (checkboxValues(element) != null) {
+      const wanted = new Set(String(value || '').split(',').filter(Boolean));
+      if (element.type === 'checkbox') {
+        element.checked = wanted.has(element.value);
+        return;
+      }
+      for (let i = 0; i < element.length; i += 1) element[i].checked = wanted.has(element[i].value);
+      return;
+    }
     if (typeof element.length === 'number' && element[0] && element[0].type === 'radio') {
       for (let i = 0; i < element.length; i += 1) element[i].checked = element[i].value === value;
       return;

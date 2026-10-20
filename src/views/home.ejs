@@ -98,6 +98,14 @@
           只看我的鄉鎮
         </label>
       <% } %>
+      <% if (user && parseSlots(user.slots).length) { %>
+        <label class="check filter-fit">
+          <input type="checkbox" name="fit" value="1" <%= filterFit ? 'checked' : '' %>>
+          只看符合我時段
+        </label>
+      <% } else if (user) { %>
+        <p class="hint filter-fit-hint">只看符合我時段要先在<a href="/account">帳號頁</a>選好方便互助時段。</p>
+      <% } %>
       <div class="search-bar">
         <div class="field search-field<%= filterQuery ? ' has-clear' : '' %>">
           <label for="q">搜尋</label>
@@ -137,6 +145,7 @@
           <span class="tag"><%= categoryLabel(post.category) %></span>
           <% if (post.city) { %><span class="tag"><%= placeLabel(post.city, post.district) %></span><% } %>
           <% if (post.meeting_mode) { %><span class="tag" data-meeting-mode="<%= post.meeting_mode %>"><%= post.meeting_mode %></span><% } %>
+          <%- include('partials/slot-tags', { value: post.slots }) %>
           <span>標示 <%= formatMerit(post.amount) %> 功德</span>
         </p>
         <% if (user && !user.blocked) { %>

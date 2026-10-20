@@ -1,0 +1,2 @@
+<% const picked = parseSlots(typeof value === 'undefined' ? '' : value); %>
+<% if (picked.length) { %><span class="slot-tags"><% picked.forEach(function (slot) { %><span class="tag tag-slot"><%= slot %></span><% }) %></span><% } %>

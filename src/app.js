@@ -16,6 +16,7 @@ const {
 } = require('./constants');
 const { RULES_HIGHLIGHTS, RULES_PAGE } = require('./rules-copy');
 const { CITIES, DISTRICTS, normalizeCity, normalizeDistrict, placeLabel } = require('./places');
+const { SLOTS, parseSlots } = require('./slots');
 const { templatesFor, findTemplate } = require('./templates');
 const { formatMerit, formatTaipei } = require('./time');
 
@@ -130,6 +131,8 @@ function createApp(options = {}) {
   };
   app.locals.asset = asset;
   app.locals.placeLabel = placeLabel;
+  app.locals.slots = SLOTS;
+  app.locals.parseSlots = parseSlots;
 
   app.get('/manifest.webmanifest', (req, res) => {
     res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
@@ -184,7 +187,7 @@ function createApp(options = {}) {
     res.locals.user = null;
     if (req.session.userId) {
       res.locals.user = options.db.prepare(`
-        SELECT id, mobile, display_name, role, merit, quota, blocked, block_reason, city, district, availability,
+        SELECT id, mobile, display_name, role, merit, quota, blocked, block_reason, city, district, availability, slots,
                rules_acknowledged_at, last_seen_at, hide_last_seen
         FROM users WHERE id = ?
       `).get(req.session.userId) || null;
@@ -371,6 +374,8 @@ function createApp(options = {}) {
       ? { city: res.locals.user.city, district: res.locals.user.district }
       : null;
     const filterLocal = req.query.local === '1' && !!mine;
+    const fitSlots = res.locals.user ? parseSlots(res.locals.user.slots) : [];
+    const filterFit = req.query.fit === '1' && fitSlots.length > 0;
     let district = '';
     const rawDistrict = Array.isArray(req.query.district) ? req.query.district[0] : req.query.district;
     if (normalized && rawDistrict) {
@@ -386,6 +391,7 @@ function createApp(options = {}) {
     if (category) kept.set('category', category);
     if (publicMeeting) kept.set('public', '1');
     if (filterLocal) kept.set('local', '1');
+    if (filterFit) kept.set('fit', '1');
     if (sort !== 'new') kept.set('sort', sort);
     const onboarding = res.locals.user ? services.onboardingFor(res.locals.user.id) : null;
     if (onboarding && onboarding.complete) services.dismissOnboarding(res.locals.user.id);
@@ -396,6 +402,7 @@ function createApp(options = {}) {
         district: district || null,
         localCity: filterLocal ? mine.city : null,
         localDistrict: filterLocal ? mine.district : null,
+        fitSlots: filterFit ? fitSlots : null,
         category: category || null,
         publicMeeting,
         query,
@@ -407,6 +414,7 @@ function createApp(options = {}) {
       filterCity: normalized || 'all',
       filterDistrict: district,
       filterLocal,
+      filterFit,
       filterCategory: category,
       filterPublic: publicMeeting,
       filterQuery: query,
@@ -683,6 +691,7 @@ function createApp(options = {}) {
 
   app.post('/account', requireCsrf, requireLogin, (req, res) => {
     try {
+      services.updateSlots(res.locals.user.id, req.body.slots);
       services.updateAccountPlace(res.locals.user.id, req.body);
       services.updateAvailability(res.locals.user.id, req.body.availability);
       redirectWith(req, res, '/account', { type: 'ok', message: '已記下你的縣市與今日空檔。' });

@@ -367,9 +367,19 @@ form { margin: 12px 0 20px; }
 .filter select,
 .place-select { min-height: 48px; }
 .filter-public,
-.filter-local { grid-column: 1 / -1; align-items: center; min-height: 48px; margin: 0; }
+.filter-local,
+.filter-fit { grid-column: 1 / -1; align-items: center; min-height: 48px; margin: 0; }
 .filter-public input,
-.filter-local input { width: 22px; height: 22px; min-height: 22px; margin: 0; flex: 0 0 auto; }
+.filter-local input,
+.filter-fit input { width: 22px; height: 22px; min-height: 22px; margin: 0; flex: 0 0 auto; }
+.filter-fit-hint { grid-column: 1 / -1; margin: 0; }
+.filter-fit-hint a { display: inline-flex; align-items: center; min-height: 48px; }
+.slot-picks .slot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+.slot-picks .choice { display: flex; align-items: center; gap: 8px; min-height: 48px; margin: 0; }
+.slot-picks .choice input { width: 22px; height: 22px; min-height: 22px; margin: 0; flex: 0 0 auto; }
+.slot-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; vertical-align: middle; }
+.tag-slot { font-size: 0.75rem; line-height: 1.6; padding: 1px 6px; }
+.slot-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .search-bar { grid-column: 1 / -1; display: grid; gap: 8px; }
 .search-field { position: relative; }
 .search-field input { min-height: 44px; }
