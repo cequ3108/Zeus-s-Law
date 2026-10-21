@@ -13,6 +13,10 @@ const { milestoneBoard } = require('./milestones');
 const BANNED_PHRASES = ['現金', '轉帳給我', '匯款', '付錢'];
 const THANK_BANNED = ['現金', '轉帳', '匯款', '付錢', '付現', '紅包', '街口', '微信支付'];
 const THANK_BANNED_LATIN = ['linepay', 'paypal', 'wechatpay', 'applepay'];
+const QUESTION_BANNED = ['現金', '轉帳', '匯款', '街口'];
+const QUESTION_LIMIT = 150;
+const QUESTION_WINDOW_MS = 24 * 60 * 60 * 1000;
+const QUESTION_MAX = 3;
 const THANKS_LIMIT = 100;
 const RATING_REMIND_MS = 14 * 24 * 60 * 60 * 1000;
 const REPORT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -63,6 +67,14 @@ function createServices(db, options = {}) {
   function assertNoCashLanguage(text) {
     const hit = BANNED_PHRASES.find((phrase) => text.includes(phrase));
     if (hit) throw new AppError(`請不要寫「${hit}」。功德不可購買、兌現或轉售。`);
+  }
+
+  function assertQuestionClean(text) {
+    if (QUESTION_BANNED.some((phrase) => text.includes(phrase))) {
+      throw new AppError('宙斯法則禁止現金交易');
+    }
+    const folded = text.toLowerCase().replace(/\s+/g, '');
+    if (folded.includes('linepay')) throw new AppError('宙斯法則禁止現金交易');
   }
 
   function assertThankYouClean(text) {
@@ -1203,7 +1215,8 @@ function createServices(db, options = {}) {
              (SELECT COUNT(*) FROM ratings WHERE ratee_id = u.id) AS author_count,
              (SELECT COUNT(*) FROM posts WHERE host_id = u.id AND status = 'settled') AS author_helped,
              (SELECT COUNT(*) FROM posts c WHERE c.status = 'settled' AND (c.host_id = u.id OR c.seeker_id = u.id)) AS author_completed,
-             (SELECT COUNT(*) FROM ratings fr WHERE fr.ratee_id = u.id AND fr.stars = 5) AS author_fives
+             (SELECT COUNT(*) FROM ratings fr WHERE fr.ratee_id = u.id AND fr.stars = 5) AS author_fives,
+             (SELECT COUNT(*) FROM post_questions q WHERE q.post_id = p.id AND q.hidden_at IS NULL) AS question_count
       FROM posts p
       JOIN users u ON u.id = p.author_id
       WHERE ${where.join(' AND ')}
@@ -1304,7 +1317,9 @@ function createServices(db, options = {}) {
              (SELECT COUNT(*) FROM ratings fr WHERE fr.ratee_id = a.id AND fr.stars = 5) AS author_fives,
              (SELECT COUNT(*) FROM posts c WHERE b.id IS NOT NULL AND c.status = 'settled' AND (c.host_id = b.id OR c.seeker_id = b.id)) AS accepter_completed,
              (SELECT COUNT(*) FROM ratings fr WHERE b.id IS NOT NULL AND fr.ratee_id = b.id AND fr.stars = 5) AS accepter_fives,
-             EXISTS(SELECT 1 FROM ratings r WHERE r.post_id = p.id AND r.rater_id = ?) AS i_rated
+             EXISTS(SELECT 1 FROM ratings r WHERE r.post_id = p.id AND r.rater_id = ?) AS i_rated,
+             (SELECT COUNT(*) FROM post_questions q
+               WHERE q.post_id = p.id AND q.answer IS NULL AND q.hidden_at IS NULL) AS unanswered
       FROM posts p
       JOIN users a ON a.id = p.author_id
       LEFT JOIN users b ON b.id = p.accepter_id
@@ -1555,7 +1570,109 @@ function createServices(db, options = {}) {
         'SELECT 1 FROM bookmarks WHERE user_id = ? AND post_id = ?'
       ).get(viewer.id, row.id)),
       canBookmark: !!(viewer && viewer.blocked !== 1 && !pairHidden(viewer.id, row.author_id)),
+      questions: questionsFor(row, viewer),
     };
+  }
+
+  function questionsWritable(post) {
+    return !!(post && post.status === 'open' && !isExpired(post));
+  }
+
+  function questionsFor(post, viewer) {
+    const concealed = !!(viewer && pairHidden(viewer.id, post.author_id));
+    if (concealed) return { concealed: true, items: [], canAsk: false, open: false, publicCount: 0 };
+    const isAuthor = !!(viewer && viewer.id === post.author_id);
+    const isFounder = !!(viewer && viewer.role === 'founder');
+    const rows = db.prepare(`
+      SELECT q.id, q.question, q.answer, q.answered_at, q.hidden_at, q.created_at, q.asker_id,
+             u.display_name AS asker_name
+      FROM post_questions q
+      JOIN users u ON u.id = q.asker_id
+      WHERE q.post_id = ?
+      ORDER BY q.id ASC
+    `).all(post.id);
+    const items = rows.filter((row) => {
+      if (row.hidden_at && !isAuthor && !isFounder && !(viewer && viewer.id === row.asker_id)) return false;
+      if (!isAuthor && !isFounder && viewer && pairHidden(viewer.id, row.asker_id)) return false;
+      return true;
+    }).map((row) => ({
+      id: row.id,
+      question: row.question,
+      answer: row.answer,
+      answeredAt: row.answered_at,
+      createdAt: row.created_at,
+      hidden: !!row.hidden_at,
+      asker: { id: row.asker_id, name: row.asker_name },
+      canAnswer: isAuthor && questionsWritable(post) && !row.answer && !row.hidden_at,
+      canHide: isAuthor && !row.hidden_at,
+      canDelete: isFounder,
+    }));
+    return {
+      concealed: false,
+      open: questionsWritable(post),
+      canAsk: !!(viewer && viewer.blocked !== 1 && questionsWritable(post) && !isAuthor),
+      publicCount: rows.filter((row) => !row.hidden_at).length,
+      isAuthor,
+      items,
+    };
+  }
+
+  function askQuestion(postId, userId, raw) {
+    const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
+    if (!post) throw new AppError('找不到這則互助。');
+    const actor = mustUser(userId);
+    if (actor.blocked) throw new AppError('你的帳號已被封鎖，不能提問。');
+    if (!questionsWritable(post)) throw new AppError('這則已經不能再問。');
+    if (actor.id === post.author_id) throw new AppError('不能問自己的貼文。');
+    if (pairHidden(actor.id, post.author_id)) throw new AppError('你們已設定不想再遇到，不能提問。');
+    const question = cleanText(raw, '提問', { max: QUESTION_LIMIT });
+    assertQuestionClean(question);
+    const since = new Date(clock().getTime() - QUESTION_WINDOW_MS).toISOString();
+    const recent = db.prepare(`
+      SELECT COUNT(*) AS count FROM post_questions
+      WHERE post_id = ? AND asker_id = ? AND created_at > ?
+    `).get(post.id, actor.id, since).count;
+    if (recent >= QUESTION_MAX) throw new AppError('同一則貼文 24 小時內最多問 3 次。');
+    const info = db.prepare(`
+      INSERT INTO post_questions (post_id, asker_id, question, created_at)
+      VALUES (?, ?, ?, ?)
+    `).run(post.id, actor.id, question, clock().toISOString());
+    return { id: Number(info.lastInsertRowid) };
+  }
+
+  function answerQuestion(postId, questionId, userId, raw) {
+    const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
+    if (!post) throw new AppError('找不到這則互助。');
+    const actor = mustUser(userId);
+    if (actor.id !== post.author_id) throw new AppError('只有發文者可以回覆。');
+    if (!questionsWritable(post)) throw new AppError('這則已經不能再回覆。');
+    const row = db.prepare('SELECT * FROM post_questions WHERE id = ? AND post_id = ?').get(questionId, post.id);
+    if (!row) throw new AppError('找不到這則提問。');
+    if (row.hidden_at) throw new AppError('這則提問已經隱藏。');
+    if (row.answer) throw new AppError('已經回覆過了。');
+    const answer = cleanText(raw, '回覆', { max: QUESTION_LIMIT });
+    assertQuestionClean(answer);
+    db.prepare(`
+      UPDATE post_questions SET answer = ?, answered_at = ? WHERE id = ? AND answer IS NULL
+    `).run(answer, clock().toISOString(), row.id);
+    return { id: row.id };
+  }
+
+  function hideQuestion(postId, questionId, userId) {
+    const post = db.prepare('SELECT id, author_id FROM posts WHERE id = ?').get(postId);
+    if (!post) throw new AppError('找不到這則互助。');
+    const actor = mustUser(userId);
+    if (actor.id !== post.author_id) throw new AppError('只有發文者可以隱藏提問。');
+    const changed = db.prepare(`
+      UPDATE post_questions SET hidden_at = ? WHERE id = ? AND post_id = ? AND hidden_at IS NULL
+    `).run(clock().toISOString(), questionId, post.id);
+    if (changed.changes !== 1) throw new AppError('找不到這則提問。');
+  }
+
+  function deleteQuestion(postId, questionId, actorId) {
+    assertFounder(actorId);
+    const changed = db.prepare('DELETE FROM post_questions WHERE id = ? AND post_id = ?').run(questionId, postId);
+    if (changed.changes !== 1) throw new AppError('找不到這則提問。');
   }
 
   function toggleBookmark(userId, postId) {
@@ -2006,6 +2123,10 @@ function createServices(db, options = {}) {
     pendingRatings,
     getProfile,
     postPage,
+    askQuestion,
+    answerQuestion,
+    hideQuestion,
+    deleteQuestion,
     milestoneCounts,
     toggleBookmark,
     listBookmarks,

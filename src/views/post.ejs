@@ -202,6 +202,8 @@
     <p>你留了感謝：<%= model.myThanks.body %></p>
   <% } %>
 
+  <%- include('partials/questions') %>
+
   <% if (!user || user.id !== model.author.id) { %>
     <p class="report-link"><a href="/posts/<%= model.id %>/report">檢舉</a></p>
   <% } %>

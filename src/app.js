@@ -778,6 +778,69 @@ function createApp(options = {}) {
     submitReport(req, res, 'post');
   });
 
+  app.post('/posts/:id/questions', requireCsrf, requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    const back = `/posts/${req.params.id}#qa`;
+    if (!id) {
+      res.redirect('/');
+      return;
+    }
+    try {
+      services.askQuestion(id, res.locals.user.id, req.body.question);
+      redirectWith(req, res, back, { type: 'ok', message: '已送出提問。' });
+    } catch (err) {
+      handle(err, req, res, back);
+    }
+  });
+
+  app.post('/posts/:id/questions/:qid/answer', requireCsrf, requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    const qid = parseId(req.params.qid);
+    const back = `/posts/${req.params.id}#qa`;
+    if (!id || !qid) {
+      res.redirect(id ? `/posts/${id}` : '/');
+      return;
+    }
+    try {
+      services.answerQuestion(id, qid, res.locals.user.id, req.body.answer);
+      redirectWith(req, res, back, { type: 'ok', message: '已回覆。' });
+    } catch (err) {
+      handle(err, req, res, back);
+    }
+  });
+
+  app.post('/posts/:id/questions/:qid/hide', requireCsrf, requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    const qid = parseId(req.params.qid);
+    const back = `/posts/${req.params.id}#qa`;
+    if (!id || !qid) {
+      res.redirect('/');
+      return;
+    }
+    try {
+      services.hideQuestion(id, qid, res.locals.user.id);
+      redirectWith(req, res, back, { type: 'ok', message: '已隱藏這則提問。' });
+    } catch (err) {
+      handle(err, req, res, back);
+    }
+  });
+
+  app.post('/posts/:id/questions/:qid/delete', requireCsrf, requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    const qid = parseId(req.params.qid);
+    const back = `/posts/${req.params.id}#qa`;
+    if (!id || !qid) {
+      res.redirect('/');
+      return;
+    }
+    try {
+      services.deleteQuestion(id, qid, res.locals.user.id);
+      redirectWith(req, res, back, { type: 'ok', message: '已刪除這則提問。' });
+    } catch (err) {
+      handle(err, req, res, back);
+    }
+  });
+
   app.get('/posts/:id', (req, res) => {
     const id = parseId(req.params.id);
     const model = id ? services.postPage(id, res.locals.user && res.locals.user.id) : null;

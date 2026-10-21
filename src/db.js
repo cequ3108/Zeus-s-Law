@@ -78,6 +78,19 @@ CREATE INDEX IF NOT EXISTS idx_posts_status ON posts (status, id);
 CREATE INDEX IF NOT EXISTS idx_posts_author ON posts (author_id);
 CREATE INDEX IF NOT EXISTS idx_posts_accepter ON posts (accepter_id);
 
+CREATE TABLE IF NOT EXISTS post_questions (
+  id INTEGER PRIMARY KEY,
+  post_id INTEGER NOT NULL REFERENCES posts(id),
+  asker_id INTEGER NOT NULL REFERENCES users(id),
+  question TEXT NOT NULL,
+  answer TEXT,
+  answered_at TEXT,
+  hidden_at TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_post_questions_post ON post_questions (post_id, created_at, id);
+
 CREATE TABLE IF NOT EXISTS daily_settlements (
   id INTEGER PRIMARY KEY,
   user_lo INTEGER NOT NULL REFERENCES users(id),
@@ -309,6 +322,17 @@ function migrate(db) {
     CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (status, created_at, id);
     CREATE INDEX IF NOT EXISTS idx_reports_target ON reports (target_type, target_id);
     CREATE INDEX IF NOT EXISTS idx_ledger_user_time ON ledger (user_id, created_at, id);
+    CREATE TABLE IF NOT EXISTS post_questions (
+      id INTEGER PRIMARY KEY,
+      post_id INTEGER NOT NULL REFERENCES posts(id),
+      asker_id INTEGER NOT NULL REFERENCES users(id),
+      question TEXT NOT NULL,
+      answer TEXT,
+      answered_at TEXT,
+      hidden_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_post_questions_post ON post_questions (post_id, created_at, id);
   `);
 }
 

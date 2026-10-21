@@ -379,6 +379,16 @@ form { margin: 12px 0 20px; }
 .slot-picks .choice input { width: 22px; height: 22px; min-height: 22px; margin: 0; flex: 0 0 auto; }
 .slot-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; vertical-align: middle; }
 .tag-slot { font-size: 0.75rem; line-height: 1.6; padding: 1px 6px; }
+.tag-qa { font-size: 0.75rem; }
+.qa { margin-top: 20px; }
+.qa-item { border-top: 1px solid var(--line); padding: 12px 0; }
+.qa-item .answer { margin: 8px 0 0; padding: 10px 12px; background: var(--soft); border-radius: 10px; }
+.qa textarea { min-height: 88px; }
+.qa button { min-height: 44px; }
+.qa .meta { margin-bottom: 4px; }
+@media (max-width: 560px) {
+  .qa button { width: 100%; }
+}
 .slot-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .search-bar { grid-column: 1 / -1; display: grid; gap: 8px; }
 .search-field { position: relative; }

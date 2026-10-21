@@ -146,6 +146,7 @@
           <% if (post.city) { %><span class="tag"><%= placeLabel(post.city, post.district) %></span><% } %>
           <% if (post.meeting_mode) { %><span class="tag" data-meeting-mode="<%= post.meeting_mode %>"><%= post.meeting_mode %></span><% } %>
           <%- include('partials/slot-tags', { value: post.slots }) %>
+          <% if (post.question_count) { %><span class="tag tag-qa">問答 <%= post.question_count %></span><% } %>
           <span>標示 <%= formatMerit(post.amount) %> 功德</span>
         </p>
         <% if (user && !user.blocked) { %>
