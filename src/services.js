@@ -47,6 +47,15 @@ function createServices(db, options = {}) {
     return name;
   }
 
+  function assertNameAvailable(name, exceptId = 0) {
+    const key = String(name || '').trim().toLowerCase();
+    const taken = db.prepare(`
+      SELECT id FROM users
+      WHERE id != ? AND lower(trim(display_name)) = ?
+    `).get(exceptId || 0, key);
+    if (taken) throw new AppError('這個名稱已經有人使用，請換一個');
+  }
+
   function expiryHours(raw) {
     if (raw == null || raw === '') return 48;
     const hours = Number(raw);
@@ -389,7 +398,9 @@ function createServices(db, options = {}) {
   function register(rawMobile, displayName) {
     const mobile = normalizeMobile(rawMobile);
     if (findByMobile(mobile)) throw new AppError('這個手機號碼已經註冊，請直接登入。');
-    return insertUser({ mobile, displayName: cleanName(displayName), role: 'user' });
+    const name = cleanName(displayName);
+    assertNameAvailable(name);
+    return insertUser({ mobile, displayName: name, role: 'user' });
   }
 
   function registerWithPassword(rawMobile, displayName, rawPassword, rawConfirm) {
@@ -397,9 +408,11 @@ function createServices(db, options = {}) {
     if (findByMobile(mobile)) throw new AppError('這個手機號碼已經註冊，請直接登入。');
     const password = cleanPassword(rawPassword);
     if (password !== String(rawConfirm ?? '')) throw new AppError('兩次輸入的密碼不一樣。');
+    const name = cleanName(displayName);
+    assertNameAvailable(name);
     return insertUser({
       mobile,
-      displayName: cleanName(displayName),
+      displayName: name,
       role: 'user',
       passwordHash: hashPassword(password),
     });
@@ -1021,13 +1034,14 @@ function createServices(db, options = {}) {
     const mobile = normalizeMobile(rawMobile);
     const name = cleanName(displayName, 30);
     const existing = findByMobile(mobile);
+    if (existing && existing.role === 'founder') throw new AppError('創辦人不能改成福利機構。');
+    if (existing && existing.role === 'org') throw new AppError('這個帳號已經是福利機構。');
+    if (existing && existing.blocked) throw new AppError('這個帳號已被封鎖。');
+    assertNameAvailable(name, existing ? existing.id : 0);
     if (!existing) {
       const user = insertUser({ mobile, displayName: name, role: 'org' });
       return { user, created: true };
     }
-    if (existing.role === 'founder') throw new AppError('創辦人不能改成福利機構。');
-    if (existing.role === 'org') throw new AppError('這個帳號已經是福利機構。');
-    if (existing.blocked) throw new AppError('這個帳號已被封鎖。');
     const user = endow(existing, 'org', ENDOWMENTS.org);
     db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(name, user.id);
     db.prepare(`UPDATE org_applications SET status = 'approved' WHERE user_id = ? AND status = 'pending'`).run(user.id);
@@ -1040,6 +1054,7 @@ function createServices(db, options = {}) {
     if (user.role === 'org') throw new AppError('你已經是福利機構。');
     if (user.role === 'founder') throw new AppError('創辦人不用申請福利機構。');
     const name = cleanName(orgName, 30);
+    assertNameAvailable(name, user.id);
     const pending = db.prepare(`
       SELECT id FROM org_applications WHERE user_id = ? AND status = 'pending'
     `).get(userId);
@@ -1058,12 +1073,26 @@ function createServices(db, options = {}) {
       const user = mustUser(application.user_id);
       if (user.role === 'founder') throw new AppError('創辦人不能改成福利機構。');
       if (user.blocked) throw new AppError('這個帳號已被封鎖。');
+      const name = cleanName(application.org_name, 30);
+      assertNameAvailable(name, user.id);
       if (user.role !== 'org') endow(user, 'org', ENDOWMENTS.org);
-      db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(application.org_name, user.id);
+      db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(name, user.id);
       db.prepare(`UPDATE org_applications SET status = 'approved' WHERE id = ?`).run(application.id);
       closePendingApplications(user.id, 'rejected', application.id);
       return mustUser(user.id);
     }).immediate();
+  }
+
+  function renameUser(actorId, rawMobile, rawName) {
+    assertFounder(actorId);
+    const user = findByMobile(normalizeMobile(rawMobile));
+    if (!user) throw new AppError('找不到這個手機號碼。');
+    const name = cleanName(rawName, user.role === 'org' ? 30 : 20);
+    assertNameAvailable(name, user.id);
+    if (name !== user.display_name) {
+      db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(name, user.id);
+    }
+    return mustUser(user.id);
   }
 
   function rejectApplication(actorId, applicationId) {
@@ -2168,6 +2197,7 @@ function createServices(db, options = {}) {
     currentAnnouncement,
     dismissAnnouncement,
     createOrg,
+    renameUser,
     applyOrg,
     approveApplication,
     rejectApplication,

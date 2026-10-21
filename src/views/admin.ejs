@@ -187,6 +187,23 @@
   </section>
 
   <section class="card">
+    <h2>改名稱</h2>
+    <p class="hint">只有創辦人可以改任何帳號的名稱，包含自己。一般使用者和福利機構不能自己改。前後空白會去掉，英文不分大小寫，不能跟別人重複。一般使用者最多 20 字，福利機構最多 30 字。</p>
+    <form class="rename-form" method="post" action="/admin/name">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="rename_mobile">手機號碼</label>
+        <input id="rename_mobile" name="mobile" required placeholder="0912345678" value="<%= queryMobile %>">
+      </div>
+      <div class="field">
+        <label for="rename_name">新名稱</label>
+        <input id="rename_name" name="display_name" maxlength="30" required>
+      </div>
+      <button type="submit">改名稱</button>
+    </form>
+  </section>
+
+  <section class="card">
     <h2>建立福利機構</h2>
     <p class="hint">新號碼會直接成為機構。已存在的一般使用者會升為機構，功德與額度設為 1,000,000。已經是機構或創辦人則不會改餘額。</p>
     <form method="post" action="/admin/orgs">

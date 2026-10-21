@@ -1251,6 +1251,15 @@ function createApp(options = {}) {
     }
   });
 
+  app.post('/admin/name', requireCsrf, requireFounder, (req, res) => {
+    try {
+      const user = services.renameUser(res.locals.user.id, req.body.mobile, req.body.display_name);
+      redirectWith(req, res, '/admin', { type: 'ok', message: `已把名稱改成「${user.display_name}」。` });
+    } catch (err) {
+      handle(err, req, res, '/admin');
+    }
+  });
+
   app.post('/admin/orgs', requireCsrf, requireFounder, (req, res) => {
     try {
       const result = services.createOrg(res.locals.user.id, req.body.mobile, req.body.display_name);

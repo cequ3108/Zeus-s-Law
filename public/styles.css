@@ -383,6 +383,10 @@ form { margin: 12px 0 20px; }
 .tag-soon { font-size: 0.75rem; background: var(--seal); color: #fff8ef; }
 .extend-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
 .extend-actions button { min-height: 44px; min-width: 44px; flex: 1 1 8rem; }
+.rename-form button { min-height: 44px; min-width: 44px; }
+@media (max-width: 560px) {
+  .rename-form button { width: 100%; }
+}
 .tab-badge-soon { right: auto; left: 8px; }
 .qa { margin-top: 20px; }
 .qa-item { border-top: 1px solid var(--line); padding: 12px 0; }
