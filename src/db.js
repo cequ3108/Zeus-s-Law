@@ -72,12 +72,30 @@ CREATE TABLE IF NOT EXISTS posts (
   meeting_time TEXT,
   meeting_mode TEXT,
   slots TEXT,
-  extended_count INTEGER NOT NULL DEFAULT 0
+  extended_count INTEGER NOT NULL DEFAULT 0,
+  seats INTEGER NOT NULL DEFAULT 1,
+  filled_count INTEGER NOT NULL DEFAULT 0,
+  reserved_merit INTEGER NOT NULL DEFAULT 0,
+  parent_id INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_posts_status ON posts (status, id);
 CREATE INDEX IF NOT EXISTS idx_posts_author ON posts (author_id);
 CREATE INDEX IF NOT EXISTS idx_posts_accepter ON posts (accepter_id);
+
+CREATE TABLE IF NOT EXISTS post_slots (
+  id INTEGER PRIMARY KEY,
+  post_id INTEGER NOT NULL REFERENCES posts(id),
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  child_post_id INTEGER NOT NULL REFERENCES posts(id),
+  status TEXT NOT NULL CHECK (status IN ('accepted', 'removed', 'settled')),
+  accepted_at TEXT NOT NULL,
+  removed_at TEXT,
+  UNIQUE (post_id, user_id),
+  UNIQUE (child_post_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_post_slots_post ON post_slots (post_id, status, id);
 
 CREATE TABLE IF NOT EXISTS post_questions (
   id INTEGER PRIMARY KEY,
@@ -260,6 +278,10 @@ function migrate(db) {
   addColumn(db, 'posts', 'meeting_mode', 'TEXT');
   addColumn(db, 'posts', 'slots', 'TEXT');
   addColumn(db, 'posts', 'extended_count', 'INTEGER NOT NULL DEFAULT 0');
+  addColumn(db, 'posts', 'seats', 'INTEGER NOT NULL DEFAULT 1');
+  addColumn(db, 'posts', 'filled_count', 'INTEGER NOT NULL DEFAULT 0');
+  addColumn(db, 'posts', 'reserved_merit', 'INTEGER NOT NULL DEFAULT 0');
+  addColumn(db, 'posts', 'parent_id', 'INTEGER');
   db.exec(`
     CREATE TABLE IF NOT EXISTS user_hides (
       user_id INTEGER NOT NULL REFERENCES users(id),
@@ -335,6 +357,18 @@ function migrate(db) {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_post_questions_post ON post_questions (post_id, created_at, id);
+    CREATE TABLE IF NOT EXISTS post_slots (
+      id INTEGER PRIMARY KEY,
+      post_id INTEGER NOT NULL REFERENCES posts(id),
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      child_post_id INTEGER NOT NULL REFERENCES posts(id),
+      status TEXT NOT NULL CHECK (status IN ('accepted', 'removed', 'settled')),
+      accepted_at TEXT NOT NULL,
+      removed_at TEXT,
+      UNIQUE (post_id, user_id),
+      UNIQUE (child_post_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_post_slots_post ON post_slots (post_id, status, id);
   `);
 }
 

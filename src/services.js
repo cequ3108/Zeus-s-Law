@@ -11,6 +11,7 @@ const { meetingShareText, lineShareUrl } = require('./share');
 const { milestoneBoard } = require('./milestones');
 
 const BANNED_PHRASES = ['現金', '轉帳給我', '匯款', '付錢'];
+const MAX_SEATS = 50;
 const THANK_BANNED = ['現金', '轉帳', '匯款', '付錢', '付現', '紅包', '街口', '微信支付'];
 const THANK_BANNED_LATIN = ['linepay', 'paypal', 'wechatpay', 'applepay'];
 const QUESTION_BANNED = ['現金', '轉帳', '匯款', '街口'];
@@ -81,7 +82,8 @@ function createServices(db, options = {}) {
     const at = new Date(post.expires_at).getTime();
     if (!Number.isFinite(at)) return false;
     const remain = at - clock().getTime();
-    return remain > 0 && remain < EXTEND_SOON_MS;
+    if (!(remain > 0 && remain < EXTEND_SOON_MS)) return false;
+    return !(Number(post.seats) > 1 && Number(post.filled_count) >= Number(post.seats));
   }
 
   function canExtendPost(post, userId) {
@@ -91,6 +93,7 @@ function createServices(db, options = {}) {
       && post.expires_at
       && !isExpired(post)
       && (post.extended_count || 0) < EXTEND_MAX
+      && !(Number(post.seats) > 1 && Number(post.filled_count) >= Number(post.seats))
     );
   }
 
@@ -505,7 +508,124 @@ function createServices(db, options = {}) {
     return updated;
   }
 
+  function cleanSeats(raw, author, kind) {
+    if (raw == null || raw === '') return 1;
+    const seats = Number(raw);
+    if (!Number.isInteger(seats) || seats < 1 || seats > MAX_SEATS) {
+      throw new AppError(`需要人數請填 1 到 ${MAX_SEATS}。`);
+    }
+    if (seats === 1) return 1;
+    if (author.role === 'user') throw new AppError('一般使用者不能發布多人任務。');
+    if (kind !== 'need') throw new AppError('多人任務只能發布「我需要」。');
+    return seats;
+  }
+
+  function addMerit(userId, amount, reason, postId, counterpartyId = null) {
+    db.prepare('UPDATE users SET merit = merit + ? WHERE id = ?').run(amount, userId);
+    recordLedger({ userId, deltaMerit: amount, deltaQuota: 0, reason, postId, counterpartyId });
+  }
+
+  function takeMerit(userId, amount, reason, postId, counterpartyId = null) {
+    const changed = db.prepare(
+      'UPDATE users SET merit = merit - ? WHERE id = ? AND merit >= ?'
+    ).run(amount, userId, amount);
+    if (changed.changes !== 1) return false;
+    recordLedger({ userId, deltaMerit: -amount, deltaQuota: 0, reason, postId, counterpartyId });
+    return true;
+  }
+
+  // 只退還沒分出去的預留。已錄取的名額留在那一筆上，等結算或移除。
+  function releaseExpiredReservations() {
+    const now = clock().toISOString();
+    const rows = db.prepare(`
+      SELECT id, author_id FROM posts
+      WHERE parent_id IS NULL AND seats > 1 AND reserved_merit > 0
+        AND status = 'open' AND expires_at IS NOT NULL AND expires_at <= ?
+    `).all(now);
+    if (!rows.length) return;
+    const apply = db.transaction(() => {
+      for (const row of rows) {
+        const current = db.prepare(
+          'SELECT reserved_merit, status FROM posts WHERE id = ?'
+        ).get(row.id);
+        if (!current || current.status !== 'open' || current.reserved_merit <= 0) continue;
+        const amount = current.reserved_merit;
+        db.prepare('UPDATE posts SET reserved_merit = 0 WHERE id = ?').run(row.id);
+        addMerit(row.author_id, amount, 'reserve_refund', row.id);
+      }
+    });
+    apply();
+  }
+
+  function pairSettleBlock(leftId, rightId) {
+    const date = taipeiDate(clock());
+    const lo = Math.min(leftId, rightId);
+    const hi = Math.max(leftId, rightId);
+    const settled = db.prepare(`
+      SELECT post_id FROM daily_settlements
+      WHERE user_lo = ? AND user_hi = ? AND taipei_date = ?
+    `).get(lo, hi, date);
+    if (settled) {
+      return `你們兩位在台北時間 ${date} 已經結算過一次。同一個人跟這位發文者一天只能結算一次，所以現在不能接。`;
+    }
+    const pending = db.prepare(`
+      SELECT id FROM posts
+      WHERE status = 'matched'
+        AND ((host_id = ? AND seeker_id = ?) OR (host_id = ? AND seeker_id = ?))
+    `).get(leftId, rightId, rightId, leftId);
+    if (pending) {
+      return '你們還有一筆互助沒結算。同一個人跟這位發文者一天只能結算一次，請先完成那一筆再接。';
+    }
+    return '';
+  }
+
+  function fundSeat(parent, accepterId) {
+    const amount = parent.amount;
+    const moved = db.prepare(`
+      UPDATE posts SET reserved_merit = reserved_merit - ?
+      WHERE id = ? AND reserved_merit >= ?
+    `).run(amount, parent.id, amount);
+    if (moved.changes === 1) return amount;
+    const fresh = db.prepare('SELECT merit FROM users WHERE id = ?').get(parent.author_id);
+    if (!takeMerit(parent.author_id, amount, 'reserve', parent.id, accepterId)) {
+      throw new AppError(`發文者目前可用功德是 ${fresh.merit}，不夠再預留 ${amount}。`);
+    }
+    return amount;
+  }
+
+  function releaseChildHold(postId) {
+    const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
+    if (!post || !post.reserved_merit || post.host_value == null || post.seeker_value == null) return;
+    const amount = post.host_value === 0 || post.seeker_value === 0
+      ? 0
+      : Math.min(post.host_value, post.seeker_value);
+    const payer = db.prepare('SELECT merit FROM users WHERE id = ?').get(post.seeker_id);
+    if (!payer || payer.merit + post.reserved_merit < amount) return;
+    const date = taipeiDate(clock());
+    const lo = Math.min(post.host_id, post.seeker_id);
+    const hi = Math.max(post.host_id, post.seeker_id);
+    const existing = db.prepare(`
+      SELECT post_id FROM daily_settlements
+      WHERE user_lo = ? AND user_hi = ? AND taipei_date = ?
+    `).get(lo, hi, date);
+    if (existing) return;
+    const held = post.reserved_merit;
+    const cleared = db.prepare(
+      'UPDATE posts SET reserved_merit = 0 WHERE id = ? AND reserved_merit = ?'
+    ).run(post.id, held);
+    if (cleared.changes !== 1) return;
+    addMerit(post.seeker_id, held, 'reserve_release', post.id, post.host_id);
+  }
+
+  function markSlotSettled(postId) {
+    db.prepare(`
+      UPDATE post_slots SET status = 'settled'
+      WHERE child_post_id = ? AND status = 'accepted'
+    `).run(postId);
+  }
+
   function createPost(authorId, input) {
+    releaseExpiredReservations();
     const author = mustUser(authorId);
     if (author.blocked) throw new AppError('你的帳號已被封鎖，不能發布或接下。');
     const kind = input.kind;
@@ -525,17 +645,31 @@ function createServices(db, options = {}) {
     const meetingTime = cleanOptional(input.meeting_time, '時間', 80);
     const meetingMode = cleanMeetingMode(input.meeting_mode);
     const slots = normalizeSlots(input.slots);
-    const info = db.prepare(`
-      INSERT INTO posts (
-        author_id, kind, category, description, amount, status, created_at,
-        city, district, title, expires_at, meeting_place, meeting_time, meeting_mode, slots
-      )
-      VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      author.id, kind, input.category, description, amount, clock().toISOString(),
-      city, district, title, expiresAt(hours), meetingPlace, meetingTime, meetingMode, slots,
-    );
-    return { id: Number(info.lastInsertRowid) };
+    const seats = cleanSeats(input.seats, author, kind);
+    const reserveTotal = seats > 1 ? seats * amount : 0;
+    if (reserveTotal > author.merit) {
+      throw new AppError(`功德不夠預留。這則需要 ${reserveTotal}（${seats} 人 × ${amount}），你目前可用 ${author.merit}。`);
+    }
+    const insert = () => {
+      const info = db.prepare(`
+        INSERT INTO posts (
+          author_id, kind, category, description, amount, status, created_at,
+          city, district, title, expires_at, meeting_place, meeting_time, meeting_mode, slots,
+          seats, reserved_merit
+        )
+        VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        author.id, kind, input.category, description, amount, clock().toISOString(),
+        city, district, title, expiresAt(hours), meetingPlace, meetingTime, meetingMode, slots,
+        seats, reserveTotal,
+      );
+      const id = Number(info.lastInsertRowid);
+      if (reserveTotal > 0 && !takeMerit(author.id, reserveTotal, 'reserve', id)) {
+        throw new AppError(`功德不夠預留。這則需要 ${reserveTotal}（${seats} 人 × ${amount}），你目前可用 ${author.merit}。`);
+      }
+      return { id };
+    };
+    return reserveTotal > 0 ? db.transaction(insert).immediate() : insert();
   }
 
   function updateAccountPlace(userId, input) {
@@ -557,7 +691,69 @@ function createServices(db, options = {}) {
     return mustUser(userId);
   }
 
+  function acceptGroup(postId, userId) {
+    return db.transaction(() => {
+      const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
+      if (!post || post.parent_id || post.status !== 'open' || isExpired(post)) {
+        throw new AppError('這則已經不能接下。');
+      }
+      if (post.filled_count >= post.seats) throw new AppError('這則已經額滿。');
+      const actor = mustUser(userId);
+      const author = mustUser(post.author_id);
+      if (actor.blocked) throw new AppError('你的帳號已被封鎖，不能發布或接下。');
+      if (author.blocked) throw new AppError('發布者已被封鎖，這則不能接下。');
+      if (actor.id === author.id) throw new AppError('不能接下自己的貼文。');
+      if (pairHidden(actor.id, author.id)) {
+        throw new AppError('你們已設定不想再遇到，不能接下這則。');
+      }
+      const prior = db.prepare(
+        'SELECT status FROM post_slots WHERE post_id = ? AND user_id = ?'
+      ).get(post.id, actor.id);
+      if (prior) throw new AppError('你已經搶過這則，不能再佔名額。');
+      const blocked = pairSettleBlock(author.id, actor.id);
+      if (blocked) throw new AppError(blocked);
+
+      const claimed = db.prepare(`
+        UPDATE posts SET filled_count = filled_count + 1
+        WHERE id = ? AND status = 'open' AND filled_count < seats
+      `).run(post.id);
+      if (claimed.changes !== 1) throw new AppError('這則已經額滿。');
+      fundSeat(post, actor.id);
+
+      const info = db.prepare(`
+        INSERT INTO posts (
+          author_id, kind, category, description, amount, status, created_at,
+          city, district, title, meeting_place, meeting_time, meeting_mode, slots,
+          accepter_id, host_id, seeker_id, matched_at, parent_id, seats, reserved_merit
+        )
+        VALUES (?, ?, ?, ?, ?, 'matched', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+      `).run(
+        author.id, post.kind, post.category, post.description, post.amount, clock().toISOString(),
+        post.city, post.district, post.title, post.meeting_place, post.meeting_time, post.meeting_mode, post.slots,
+        actor.id, actor.id, author.id, clock().toISOString(), post.id, post.amount,
+      );
+      const childId = Number(info.lastInsertRowid);
+      try {
+        db.prepare(`
+          INSERT INTO post_slots (post_id, user_id, child_post_id, status, accepted_at)
+          VALUES (?, ?, ?, 'accepted', ?)
+        `).run(post.id, actor.id, childId, clock().toISOString());
+      } catch (err) {
+        if (err && (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || /UNIQUE/.test(String(err.message)))) {
+          throw new AppError('你已經搶過這則，不能再佔名額。');
+        }
+        throw err;
+      }
+      return { id: post.id, childId, group: true };
+    }).immediate();
+  }
+
   function acceptPost(postId, userId) {
+    const peek = db.prepare('SELECT seats, parent_id FROM posts WHERE id = ?').get(postId);
+    if (peek && !peek.parent_id && Number(peek.seats) > 1) {
+      releaseExpiredReservations();
+      return acceptGroup(postId, userId);
+    }
     return db.transaction(() => {
       const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
       if (!post || post.status !== 'open' || isExpired(post)) throw new AppError('這則已經不能接下。');
@@ -590,6 +786,7 @@ function createServices(db, options = {}) {
   }
 
   function repostPost(postId, userId) {
+    releaseExpiredReservations();
     return db.transaction(() => {
       const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
       if (!post || post.author_id !== userId || post.status !== 'open') {
@@ -599,6 +796,10 @@ function createServices(db, options = {}) {
         UPDATE posts SET status = 'cancelled' WHERE id = ? AND author_id = ? AND status = 'open'
       `).run(post.id, userId);
       if (changed.changes !== 1) throw new AppError('這則不能重發。');
+      if (post.reserved_merit > 0) {
+        db.prepare('UPDATE posts SET reserved_merit = 0 WHERE id = ?').run(post.id);
+        addMerit(post.author_id, post.reserved_merit, 'reserve_refund', post.id);
+      }
       let hours = 48;
       if (post.expires_at) {
         const span = new Date(post.expires_at).getTime() - new Date(post.created_at).getTime();
@@ -637,6 +838,7 @@ function createServices(db, options = {}) {
       meetingMode: post.meeting_mode,
       meetingPlace: post.meeting_place || '',
       slots: post.slots,
+      seats: post.seats || 1,
     };
   }
 
@@ -667,16 +869,58 @@ function createServices(db, options = {}) {
     return db.prepare(`
       SELECT COUNT(*) AS count FROM posts
       WHERE author_id = ? AND status = 'open'
+        AND (seats <= 1 OR filled_count < seats)
         AND expires_at IS NOT NULL AND expires_at > ? AND expires_at < ?
     `).get(userId, now, soon).count;
   }
 
   function cancelPost(postId, userId) {
-    const changed = db.prepare(`
-      UPDATE posts SET status = 'cancelled'
-      WHERE id = ? AND author_id = ? AND status = 'open'
-    `).run(postId, userId);
-    if (changed.changes !== 1) throw new AppError('這則不能取消。');
+    releaseExpiredReservations();
+    db.transaction(() => {
+      const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
+      if (!post || post.author_id !== userId || post.status !== 'open') {
+        throw new AppError('這則不能取消。');
+      }
+      const changed = db.prepare(`
+        UPDATE posts SET status = 'cancelled'
+        WHERE id = ? AND author_id = ? AND status = 'open'
+      `).run(postId, userId);
+      if (changed.changes !== 1) throw new AppError('這則不能取消。');
+      if (post.reserved_merit > 0) {
+        db.prepare('UPDATE posts SET reserved_merit = 0 WHERE id = ?').run(post.id);
+        addMerit(post.author_id, post.reserved_merit, 'reserve_refund', post.id);
+      }
+    }).immediate();
+  }
+
+  function removeSlot(postId, slotId, actorId) {
+    return db.transaction(() => {
+      const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
+      if (!post || post.author_id !== actorId) throw new AppError('只有發文者可以移出。');
+      const slot = db.prepare(
+        'SELECT * FROM post_slots WHERE id = ? AND post_id = ?'
+      ).get(slotId, postId);
+      if (!slot || slot.status !== 'accepted') throw new AppError('這個人目前不能移出。');
+      const child = db.prepare('SELECT * FROM posts WHERE id = ?').get(slot.child_post_id);
+      if (!child || child.status !== 'matched') throw new AppError('這個人目前不能移出。');
+      const dropped = db.prepare(`
+        UPDATE post_slots SET status = 'removed', removed_at = ?
+        WHERE id = ? AND status = 'accepted'
+      `).run(clock().toISOString(), slot.id);
+      if (dropped.changes !== 1) throw new AppError('這個人目前不能移出。');
+      const closed = db.prepare(`
+        UPDATE posts SET status = 'cancelled', reserved_merit = 0
+        WHERE id = ? AND status = 'matched'
+      `).run(child.id);
+      if (closed.changes !== 1) throw new AppError('這個人目前不能移出。');
+      db.prepare(
+        'UPDATE posts SET filled_count = filled_count - 1 WHERE id = ? AND filled_count > 0'
+      ).run(post.id);
+      if (child.reserved_merit > 0) {
+        addMerit(post.author_id, child.reserved_merit, 'reserve_refund', child.id, slot.user_id);
+      }
+      return { id: post.id };
+    }).immediate();
   }
 
   // 同一對帳號每個台北日只能結算一次。
@@ -763,7 +1007,10 @@ function createServices(db, options = {}) {
       }
       const column = userId === post.host_id ? 'host_value' : 'seeker_value';
       db.prepare(`UPDATE posts SET ${column} = ? WHERE id = ?`).run(value, post.id);
-      return attemptSettle(post.id);
+      releaseChildHold(post.id);
+      const result = attemptSettle(post.id);
+      if (result.status === 'settled') markSlotSettled(post.id);
+      return result;
     }).immediate();
   }
 
@@ -777,7 +1024,10 @@ function createServices(db, options = {}) {
       if (post.host_value == null || post.seeker_value == null) {
         throw new AppError('雙方都要先填寫這次值多少。');
       }
-      return attemptSettle(post.id);
+      releaseChildHold(post.id);
+      const result = attemptSettle(post.id);
+      if (result.status === 'settled') markSlotSettled(post.id);
+      return result;
     }).immediate();
   }
 
@@ -1142,6 +1392,9 @@ function createServices(db, options = {}) {
     signup: '註冊起始',
     settle_receive: '招待別人收到',
     settle_spend: '被招待付出',
+    reserve: '預留功德',
+    reserve_refund: '退回預留',
+    reserve_release: '預留轉入結算',
     founder_seed: '創辦人或機構發放',
     founder_endow: '創辦人或機構發放',
     org_create: '創辦人或機構發放',
@@ -1149,6 +1402,7 @@ function createServices(db, options = {}) {
   };
 
   function meritHistory(userId, options = {}) {
+    releaseExpiredReservations();
     const user = mustUser(userId);
     const bounds = taipeiMonthRange(options.month);
     const before = Number.isInteger(options.before) && options.before > 0 ? options.before : null;
@@ -1241,7 +1495,14 @@ function createServices(db, options = {}) {
   }
 
   function listOpenPosts(filter = {}) {
-    const where = ['p.status = \'open\'', 'u.blocked = 0', '(p.expires_at IS NULL OR p.expires_at > ?)'];
+    releaseExpiredReservations();
+    const where = [
+      'p.status = \'open\'',
+      'u.blocked = 0',
+      'p.parent_id IS NULL',
+      '(p.seats <= 1 OR p.filled_count < p.seats)',
+      '(p.expires_at IS NULL OR p.expires_at > ?)',
+    ];
     const params = [filter.viewerId || 0, clock().toISOString()];
     if (filter.city) {
       where.push('p.city = ?');
@@ -1288,7 +1549,7 @@ function createServices(db, options = {}) {
     return db.prepare(`
       SELECT EXISTS(SELECT 1 FROM bookmarks b WHERE b.user_id = ? AND b.post_id = p.id) AS bookmarked,
              p.id, p.kind, p.category, p.title, p.description, p.amount, p.created_at, p.city, p.district,
-             p.meeting_mode, p.slots,
+             p.meeting_mode, p.slots, p.seats, p.filled_count,
              u.id AS author_id, u.display_name AS author_name, u.role AS author_role,
              u.availability AS author_availability,
              u.last_seen_at AS author_last_seen, u.hide_last_seen AS author_hide_last_seen,
@@ -1387,12 +1648,13 @@ function createServices(db, options = {}) {
   }
 
   function dashboard(userId) {
+    releaseExpiredReservations();
     const user = mustUser(userId);
     const nowIso = clock().toISOString();
     const posts = db.prepare(`
       SELECT p.id, p.kind, p.category, p.title, p.description, p.amount, p.status,
              p.settled_amount, p.created_at, p.expires_at, p.extended_count, p.author_id,
-             p.host_id, p.seeker_id, p.host_value, p.seeker_value,
+             p.host_id, p.seeker_id, p.host_value, p.seeker_value, p.seats, p.filled_count, p.parent_id,
              a.display_name AS author_name, b.display_name AS accepter_name,
              (SELECT COUNT(*) FROM posts c WHERE c.status = 'settled' AND (c.host_id = a.id OR c.seeker_id = a.id)) AS author_completed,
              (SELECT COUNT(*) FROM ratings fr WHERE fr.ratee_id = a.id AND fr.stars = 5) AS author_fives,
@@ -1486,6 +1748,7 @@ function createServices(db, options = {}) {
   }
 
   function postPage(postId, viewerId) {
+    releaseExpiredReservations();
     const row = db.prepare(`
       SELECT p.*,
         a.display_name AS author_name, a.role AS author_role,
@@ -1531,6 +1794,25 @@ function createServices(db, options = {}) {
             : `對方的功德是 ${payerMerit}，這則標示 ${row.amount}。扣除後必須大於 0，現在不能配對。`;
         } else {
           canAccept = true;
+        }
+      }
+    }
+    const multi = Number(row.seats) > 1 && !row.parent_id;
+    if (multi && row.status === 'open' && !expired && row.filled_count >= row.seats) {
+      canAccept = false;
+      if (!acceptHint) acceptHint = '這則已經額滿。';
+    } else if (multi && canAccept && viewer) {
+      const prior = db.prepare(
+        'SELECT 1 FROM post_slots WHERE post_id = ? AND user_id = ?'
+      ).get(row.id, viewer.id);
+      if (prior) {
+        canAccept = false;
+        acceptHint = '你已經搶過這則，不能再佔名額。';
+      } else {
+        const block = pairSettleBlock(row.author_id, viewer.id);
+        if (block) {
+          canAccept = false;
+          acceptHint = block;
         }
       }
     }
@@ -1597,7 +1879,7 @@ function createServices(db, options = {}) {
           id: seeker.id,
           name: seeker.display_name,
           role: seeker.role,
-          merit: isParty && row.status === 'matched' ? seeker.merit : null,
+          merit: isParty && row.status === 'matched' ? seeker.merit + (row.reserved_merit || 0) : null,
           slots: seeker.slots,
           badge: milestoneCounts(seeker.id).highest,
           seen: lastSeenFor(seeker, viewerId),
@@ -1620,6 +1902,25 @@ function createServices(db, options = {}) {
       seekerValue: settled ? row.seeker_value : null,
       canAccept,
       acceptHint,
+      multi,
+      seats: row.seats || 1,
+      filled: row.filled_count || 0,
+      parentId: row.parent_id || null,
+      crew: multi ? db.prepare(`
+        SELECT s.id, s.user_id, s.child_post_id, s.status, u.display_name
+        FROM post_slots s
+        JOIN users u ON u.id = s.user_id
+        WHERE s.post_id = ?
+        ORDER BY s.id
+      `).all(row.id).map((item) => ({
+        id: item.id,
+        userId: item.user_id,
+        name: item.display_name,
+        childId: item.child_post_id,
+        status: item.status,
+        canOpen: !!(viewer && item.status !== 'removed' && (viewer.id === row.author_id || viewer.id === item.user_id)),
+        canRemove: !!(viewer && viewer.id === row.author_id && item.status === 'accepted'),
+      })) : null,
       canHideAuthor: hideRelation(viewer && viewer.id, row.author_id).canHide,
       expiresAt: row.expires_at,
       expired,
@@ -2026,10 +2327,12 @@ function createServices(db, options = {}) {
     `).get(since);
     const openPosts = db.prepare(`
       SELECT COUNT(*) AS n FROM posts
-      WHERE status = 'open' AND (expires_at IS NULL OR expires_at > ?)
+      WHERE status = 'open' AND parent_id IS NULL
+        AND (seats <= 1 OR filled_count < seats)
+        AND (expires_at IS NULL OR expires_at > ?)
     `).get(nowIso).n;
     const newPosts = db.prepare(`
-      SELECT COUNT(*) AS n FROM posts WHERE created_at >= ?
+      SELECT COUNT(*) AS n FROM posts WHERE parent_id IS NULL AND created_at >= ?
     `).get(since).n;
     const settledAll = db.prepare(`
       SELECT COUNT(*) AS n FROM posts WHERE status = 'settled'
@@ -2057,7 +2360,8 @@ function createServices(db, options = {}) {
     const cities = db.prepare(`
       SELECT city, COUNT(*) AS count
       FROM posts
-      WHERE status = 'open' AND city IS NOT NULL AND city != ''
+      WHERE status = 'open' AND parent_id IS NULL AND city IS NOT NULL AND city != ''
+        AND (seats <= 1 OR filled_count < seats)
         AND (expires_at IS NULL OR expires_at > ?)
       GROUP BY city
       ORDER BY count DESC, city ASC
@@ -2171,6 +2475,8 @@ function createServices(db, options = {}) {
     updateAvailability,
     updateSlots,
     acceptPost,
+    removeSlot,
+    releaseExpiredReservations,
     repostPost,
     extendPost,
     expiringSoonCount,

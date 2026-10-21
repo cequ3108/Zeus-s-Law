@@ -16,7 +16,14 @@
       <%- include('partials/bookmark', { postId: model.id, saved: !!model.bookmarked, returnTo: '/posts/' + model.id }) %>
     <% } %>
   </div>
-  <p class="amount-line">標示 <strong><%= formatMerit(model.amount) %></strong> 功德</p>
+  <p class="amount-line">標示 <strong><%= formatMerit(model.amount) %></strong> 功德<% if (model.multi) { %> · 每人，需要 <%= model.seats %> 人<% } %></p>
+  <% if (model.multi) { %>
+    <p class="meta"><span class="tag tag-crew">已錄取 <%= model.filled %>／<%= model.seats %></span></p>
+    <p class="hint">先搶先贏。發文時已預留 <%= model.seats %> × <%= formatMerit(model.amount) %> 功德。額滿就停止招募。</p>
+  <% } %>
+  <% if (model.parentId) { %>
+    <p class="hint">這是多人任務的一個名額。<a href="/posts/<%= model.parentId %>">回到原來那則</a></p>
+  <% } %>
   <p class="hint">約 1 元價值，僅供估價參考。功德不可購買、兌現或轉售。</p>
   <p class="description"><%= model.description %></p>
   <p class="meta">
@@ -65,7 +72,7 @@
     <% } else if (model.canAccept) { %>
       <form method="post" action="/posts/<%= model.id %>/accept">
         <input type="hidden" name="_csrf" value="<%= csrf %>">
-        <button type="submit">接下這則</button>
+        <button type="submit"><%= model.multi ? '我要接' : '接下這則' %></button>
       </form>
     <% } else if (model.acceptHint) { %>
       <p class="flash flash-err"><%= model.acceptHint %></p>
@@ -74,6 +81,28 @@
     <% } else if (model.isAuthor) { %>
       <p class="hint">這是你發的。等別人來接。</p>
     <% } %>
+  <% } %>
+
+  <% if (model.crew) { %>
+    <section class="card crew">
+      <h2>錄取名單</h2>
+      <% if (!model.crew.length) { %><p class="empty">還沒有人搶到。</p><% } %>
+      <% model.crew.forEach(function (item) { %>
+        <div class="crew-item">
+          <a href="/users/<%= item.userId %>"><%= item.name %></a>
+          <span class="tag"><%= item.status === 'settled' ? '已結算' : (item.status === 'removed' ? '已移出' : '已錄取') %></span>
+          <% if (item.canOpen) { %>
+            <a class="button" href="/posts/<%= item.childId %>">去完成</a>
+          <% } %>
+          <% if (item.canRemove) { %>
+            <form method="post" action="/posts/<%= model.id %>/slots/<%= item.id %>/remove">
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <button class="secondary" type="submit">移出</button>
+            </form>
+          <% } %>
+        </div>
+      <% }) %>
+    </section>
   <% } %>
 
   <% if (model.host && model.seeker) { %>

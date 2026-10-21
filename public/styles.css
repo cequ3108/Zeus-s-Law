@@ -384,6 +384,13 @@ form { margin: 12px 0 20px; }
 .extend-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
 .extend-actions button { min-height: 44px; min-width: 44px; flex: 1 1 8rem; }
 .rename-form button { min-height: 44px; min-width: 44px; }
+.tag-crew { font-size: 0.75rem; }
+.crew-item { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.crew button, .crew .button { min-height: 44px; min-width: 44px; }
+@media (max-width: 560px) {
+  .crew form { flex: 1 1 100%; }
+  .crew button, .crew .button { width: 100%; }
+}
 @media (max-width: 560px) {
   .rename-form button { width: 100%; }
 }

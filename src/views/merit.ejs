@@ -16,7 +16,7 @@
     本月收到 <strong data-month-received="<%= history.received %>"><%= formatMerit(history.received) %></strong>
     · 本月付出 <strong data-month-paid="<%= history.paid %>"><%= formatMerit(history.paid) %></strong>
   </p>
-  <p class="hint">本月收到和付出只算這個月的結算。註冊和創辦人、機構發放另外列在下面。</p>
+  <p class="hint">本月收到和付出只算這個月的結算。註冊和創辦人、機構發放另外列在下面。多人任務的「預留功德」是先扣起來、還沒付出；「退回預留」是沒用到而退回；「預留轉入結算」之後的「結算支出」才是真正付出。</p>
   <form class="merit-filter" method="get" action="/users/<%= user.id %>/merit">
     <div class="field">
       <label for="month">月份</label>

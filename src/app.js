@@ -123,6 +123,9 @@ function createApp(options = {}) {
     org_endow: '升為機構',
     settle_spend: '結算支出',
     settle_receive: '結算收入',
+    reserve: '預留功德',
+    reserve_refund: '退回預留',
+    reserve_release: '預留轉入結算',
   }[reason] || reason);
   app.locals.starGlyph = (value) => {
     if (value == null) return '';
@@ -184,6 +187,7 @@ function createApp(options = {}) {
     const remembered = readCookie(req, MOBILE_COOKIE);
     res.locals.rememberedMobile = /^09\d{8}$/.test(remembered) ? remembered : '';
     res.locals.currentPath = req.path;
+    services.releaseExpiredReservations();
     res.locals.user = null;
     if (req.session.userId) {
       res.locals.user = options.db.prepare(`
@@ -860,8 +864,11 @@ function createApp(options = {}) {
       return;
     }
     try {
-      services.acceptPost(id, res.locals.user.id);
-      redirectWith(req, res, back, { type: 'ok', message: '已接下。互助完成後，雙方各自填寫這次值多少。' });
+      const joined = services.acceptPost(id, res.locals.user.id);
+      const message = joined && joined.group
+        ? '已錄取。完成後請到你的那一筆填寫估價。'
+        : '已接下。互助完成後，雙方各自填寫這次值多少。';
+      redirectWith(req, res, back, { type: 'ok', message });
     } catch (err) {
       handle(err, req, res, back);
     }
@@ -892,6 +899,22 @@ function createApp(options = {}) {
     try {
       const post = services.repostPost(id, res.locals.user.id);
       redirectWith(req, res, `/posts/${post.id}`, { type: 'ok', message: '已重發。原來那則已取消。' });
+    } catch (err) {
+      handle(err, req, res, back);
+    }
+  });
+
+  app.post('/posts/:id/slots/:slotId/remove', requireCsrf, requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    const slotId = parseId(req.params.slotId);
+    const back = id ? `/posts/${id}` : '/me';
+    if (!id || !slotId) {
+      res.redirect(back);
+      return;
+    }
+    try {
+      services.removeSlot(id, slotId, res.locals.user.id);
+      redirectWith(req, res, back, { type: 'ok', message: '已移出。這個名額重新開放，沒用到的預留已退回。' });
     } catch (err) {
       handle(err, req, res, back);
     }
