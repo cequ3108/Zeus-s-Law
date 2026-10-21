@@ -1,0 +1,327 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap">
+  <h1>管理</h1>
+  <p>創辦人可以建立福利機構、審核申請，以及封鎖收取現金的帳號。創辦人本身不是從這個頁面註冊出來的。</p>
+
+  <section aria-label="社群概況">
+    <h2>社群概況</h2>
+    <div class="stat-grid">
+      <article class="card stat">
+        <strong data-stat="users"><%= formatMerit(data.stats.users) %></strong>
+        <span>一般會員</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="orgs"><%= formatMerit(data.stats.orgs) %></strong>
+        <span>福利機構</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="signups"><%= formatMerit(data.stats.signups) %></strong>
+        <span>七日內新加入</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="open-posts"><%= formatMerit(data.stats.openPosts) %></strong>
+        <span>招募中</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="new-posts"><%= formatMerit(data.stats.newPosts) %></strong>
+        <span>七日內新貼文</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="settled-week"><%= formatMerit(data.stats.settledWeek) %></strong>
+        <span>七日內完成</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="settled-all"><%= formatMerit(data.stats.settledAll) %></strong>
+        <span>累計完成</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="merit-members"><%= formatMerit(data.stats.meritMembers) %></strong>
+        <span>七日內會員流動</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="merit-founder"><%= formatMerit(data.stats.meritFounder) %></strong>
+        <span>七日內創辦人發出</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="rating-avg"><%= data.stats.ratingAvg %></strong>
+        <span>平均星等</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="rating-count"><%= formatMerit(data.stats.ratingCount) %></strong>
+        <span>評分則數</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="banned"><%= formatMerit(data.stats.banned) %></strong>
+        <span>封鎖帳號</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="pending-orgs"><%= formatMerit(data.stats.pendingOrgs) %></strong>
+        <span>待審機構</span>
+      </article>
+      <article class="card stat">
+        <strong data-stat="open-reports"><%= formatMerit(data.stats.openReports) %></strong>
+        <span>待處理檢舉數</span>
+      </article>
+    </div>
+    <h3>招募中的縣市</h3>
+    <% if (!data.stats.cities.length) { %>
+      <p class="empty" data-cities="0">0</p>
+    <% } %>
+    <ol class="city-rank">
+      <% data.stats.cities.forEach(function (city) { %>
+        <li data-city="<%= city.city %>" data-count="<%= city.count %>"><%= city.city %> · <%= city.count %></li>
+      <% }) %>
+    </ol>
+  </section>
+
+  <section aria-label="檢舉">
+    <h2>檢舉</h2>
+    <% if (!data.reports.length) { %><p class="empty">目前沒有待處理的檢舉。</p><% } %>
+    <% data.reports.forEach(function (item) { %>
+      <article class="card" data-report="<%= item.id %>" data-target-count="<%= item.target_count %>">
+        <p>
+          <% if (item.targetHref) { %>
+            <a href="<%= item.targetHref %>"><%= item.targetLabel %></a>
+          <% } else { %><%= item.targetLabel %><% } %>
+          · <%= item.reason %>
+        </p>
+        <% if (item.note) { %><p data-report-note><%= item.note %></p><% } %>
+        <p class="meta">
+          檢舉人 <a href="/users/<%= item.reporter_id %>"><%= item.reporter_name %></a>
+          · <%= formatTaipei(item.created_at) %>
+          · 同一對象共 <%= item.target_count %> 則
+        </p>
+        <div class="report-actions">
+          <form method="post" action="/admin/reports/<%= item.id %>/resolve">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <button type="submit">已處理</button>
+          </form>
+          <form method="post" action="/admin/reports/<%= item.id %>/dismiss">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <button class="secondary" type="submit">駁回</button>
+          </form>
+        </div>
+      </article>
+    <% }) %>
+  </section>
+
+  <section class="card">
+    <h2>站內公告</h2>
+    <p class="hint">顯示在廣場最上方，一次只有最新一則。標題可不填。內文 1 到 40 個字，大約一兩行。時效沒填就是 72 小時。撤下或到期後就不再顯示。</p>
+    <form method="post" action="/admin/announcements">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="announcement_title">標題（可不填）</label>
+        <input id="announcement_title" name="title" maxlength="20">
+      </div>
+      <div class="field">
+        <label for="announcement_body">內文</label>
+        <textarea id="announcement_body" name="body" rows="2" maxlength="40" required></textarea>
+      </div>
+      <div class="field">
+        <label for="announcement_hours">時效（小時）</label>
+        <input id="announcement_hours" name="hours" inputmode="numeric" value="72">
+      </div>
+      <button type="submit">發布公告</button>
+    </form>
+    <% if (!data.announcements.length) { %><p class="empty">目前沒有公告。</p><% } %>
+    <% data.announcements.forEach(function (item) { %>
+      <article>
+        <p>
+          <% if (item.title) { %><strong><%= item.title %></strong> <% } %><%= item.body %>
+        </p>
+        <p class="meta">
+          <%= item.live ? '廣場上顯示中' : (item.removed ? '已撤下' : (item.expired ? '已到期' : '較新的一則顯示中')) %>
+          · 到 <%= formatTaipei(item.expires_at) %>
+        </p>
+        <% if (!item.removed) { %>
+          <form method="post" action="/admin/announcements/<%= item.id %>">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <div class="field">
+              <label for="edit_title_<%= item.id %>">修改標題</label>
+              <input id="edit_title_<%= item.id %>" name="title" value="<%= item.title || '' %>" maxlength="20">
+            </div>
+            <div class="field">
+              <label for="edit_body_<%= item.id %>">修改內文</label>
+              <input id="edit_body_<%= item.id %>" name="body" value="<%= item.body %>" maxlength="40" required>
+            </div>
+            <div class="field">
+              <label for="edit_hours_<%= item.id %>">修改時效（小時，從現在起算）</label>
+              <input id="edit_hours_<%= item.id %>" name="hours" value="72" inputmode="numeric">
+            </div>
+            <button class="secondary" type="submit">修改</button>
+          </form>
+          <form method="post" action="/admin/announcements/<%= item.id %>/remove">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <button class="secondary" type="submit">撤下</button>
+          </form>
+        <% } %>
+      </article>
+    <% }) %>
+  </section>
+
+  <section class="card">
+    <h2>查帳號</h2>
+    <form method="get" action="/admin">
+      <div class="field">
+        <label for="lookup">手機號碼</label>
+        <input id="lookup" name="mobile" value="<%= queryMobile %>" placeholder="0912345678">
+      </div>
+      <button type="submit">查詢</button>
+    </form>
+    <% if (data.lookup && data.lookup.error) { %>
+      <p class="flash flash-err"><%= data.lookup.error %></p>
+    <% } else if (data.lookup && data.lookup.missing) { %>
+      <p>沒有這個帳號。可以用下面的表單直接建立福利機構。</p>
+    <% } else if (data.lookup) { %>
+      <p>
+        <a href="/users/<%= data.lookup.id %>"><%= data.lookup.displayName %></a>
+        · <%= roleLabel(data.lookup.role) %>
+        · 功德 <%= formatMerit(data.lookup.merit) %>
+        · 額度 <%= formatMerit(data.lookup.quota) %>
+        <% if (data.lookup.blocked) { %> · 已封鎖（<%= data.lookup.blockReason %>）<% } %>
+      </p>
+      <p>不想再遇到：<%= data.lookup.hiddenBy %> 位會員把這個人列入自己的清單。這只是審核參考，不會封鎖帳號。</p>
+    <% } %>
+  </section>
+
+  <section class="card">
+    <h2>改名稱</h2>
+    <p class="hint">只有創辦人可以改任何帳號的名稱，包含自己。一般使用者和福利機構不能自己改。前後空白會去掉，英文不分大小寫，不能跟別人重複。一般使用者最多 20 字，福利機構最多 30 字。</p>
+    <form class="rename-form" method="post" action="/admin/name">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="rename_mobile">手機號碼</label>
+        <input id="rename_mobile" name="mobile" required placeholder="0912345678" value="<%= queryMobile %>">
+      </div>
+      <div class="field">
+        <label for="rename_name">新名稱</label>
+        <input id="rename_name" name="display_name" maxlength="30" required>
+      </div>
+      <button type="submit">改名稱</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>建立福利機構</h2>
+    <p class="hint">新號碼會直接成為機構。已存在的一般使用者會升為機構，功德與額度設為 1,000,000。已經是機構或創辦人則不會改餘額。</p>
+    <form method="post" action="/admin/orgs">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="org_mobile">手機號碼</label>
+        <input id="org_mobile" name="mobile" required placeholder="0912345678">
+      </div>
+      <div class="field">
+        <label for="org_name">機構名稱</label>
+        <input id="org_name" name="display_name" maxlength="30" required>
+      </div>
+      <button type="submit">建立或升為機構</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>待審核的機構申請</h2>
+    <% if (!data.applications.length) { %><p class="empty">目前沒有待審。</p><% } %>
+    <% data.applications.forEach(function (item) { %>
+      <article class="pending">
+        <p><strong><%= item.org_name %></strong> · <%= item.display_name %> · <%= item.mobile %></p>
+        <form method="post" action="/admin/applications/<%= item.id %>/approve">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button type="submit">通過</button>
+        </form>
+        <form method="post" action="/admin/applications/<%= item.id %>/reject">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="secondary" type="submit">拒絕</button>
+        </form>
+      </article>
+    <% }) %>
+  </section>
+
+  <section class="card">
+    <h2>重設密碼</h2>
+    <p class="hint">產生一組暫時密碼，只在這個畫面出現一次。資料庫只存雜湊，請私下告訴對方。</p>
+    <form method="post" action="/admin/password">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="reset_mobile">手機號碼</label>
+        <input id="reset_mobile" name="mobile" required placeholder="0912345678" value="<%= queryMobile %>">
+      </div>
+      <button type="submit">重設為暫時密碼</button>
+    </form>
+    <% if (temporaryPassword) { %>
+      <p class="flash flash-ok">已重設 <%= resetName %> 的密碼。暫時密碼：<strong id="temporary-password"><%= temporaryPassword %></strong></p>
+      <p class="hint">離開這個頁面就看不到了。餘額沒有變動。</p>
+    <% } %>
+  </section>
+
+  <section class="card">
+    <h2>封鎖收取現金的帳號</h2>
+    <form method="post" action="/admin/block">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="block_mobile">手機號碼</label>
+        <input id="block_mobile" name="mobile" required placeholder="0912345678">
+      </div>
+      <div class="field">
+        <label for="reason">原因</label>
+        <input id="reason" name="reason" value="收取現金" maxlength="200">
+      </div>
+      <button class="danger" type="submit">封鎖</button>
+    </form>
+  </section>
+
+  <section class="card thanks">
+    <h2>感謝留言</h2>
+    <p class="hint">不當的內容可以刪掉。收到的人自己不公開時，這裡還看得到。</p>
+    <% if (!data.thanks.length) { %><p class="empty">還沒有感謝留言。</p><% } %>
+    <% data.thanks.forEach(function (note) { %>
+      <article data-thanks-id="<%= note.id %>">
+        <p><%= note.body %></p>
+        <p class="meta">
+          <%= formatTaipei(note.created_at) %>
+          · <%= note.author_name %> 給 <%= note.recipient_name %>
+          <% if (note.hidden_at) { %> · 已不公開<% } %>
+          · <a href="/posts/<%= note.post_id %>">互助</a>
+        </p>
+        <form method="post" action="/admin/thanks/<%= note.id %>/delete">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="danger" type="submit">刪除這則感謝</button>
+        </form>
+      </article>
+    <% }) %>
+  </section>
+
+  <section class="card">
+    <h2>功德帳本</h2>
+    <p class="hint">每一筆只追加，不能改、不能刪。這裡只給創辦人看。</p>
+    <% if (!data.ledger.length) { %><p class="empty">還沒有紀錄。</p><% } %>
+    <% data.ledger.forEach(function (row) { %>
+      <p class="meta">
+        <%= formatTaipei(row.created_at) %>
+        · <%= row.display_name %>
+        · <%= ledgerReason(row.reason) %>
+        · 功德 <%= row.delta_merit > 0 ? '+' : '' %><%= formatMerit(row.delta_merit) %>
+        · 額度 <%= row.delta_quota > 0 ? '+' : '' %><%= formatMerit(row.delta_quota) %>
+        · 之後 <%= formatMerit(row.merit_after) %> / <%= formatMerit(row.quota_after) %>
+        <% if (row.post_id) { %> · <a href="/posts/<%= row.post_id %>">互助</a><% } %>
+      </p>
+    <% }) %>
+  </section>
+
+  <section class="card">
+    <h2>已封鎖</h2>
+    <% if (!data.blocked.length) { %><p class="empty">目前沒有被封鎖的帳號。</p><% } %>
+    <% data.blocked.forEach(function (item) { %>
+      <article class="pending">
+        <p><a href="/users/<%= item.id %>"><%= item.display_name %></a> · <%= item.mobile %> · <%= item.block_reason %></p>
+        <form method="post" action="/admin/unblock">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <input type="hidden" name="mobile" value="<%= item.mobile %>">
+          <button class="secondary" type="submit">解除封鎖</button>
+        </form>
+      </article>
+    <% }) %>
+  </section>
+</main>
+<%- include('partials/footer') %>

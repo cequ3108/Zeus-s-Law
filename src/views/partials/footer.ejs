@@ -1,0 +1,25 @@
+<footer class="site-footer">
+  <div class="wrap">
+    <p>宙斯法則只記錄互助。1 功德等於 1 元新台幣，但不能兌換現金。不收集身分證或護照。</p>
+    <p><a href="/rules">規則與常見問題</a></p>
+  </div>
+</footer>
+<nav class="tabbar" aria-label="主要">
+  <a class="<%= currentPath === '/' ? 'active' : '' %>" href="/">首頁<% if (user && watchNew) { %><span class="tab-badge" data-watch-new="<%= watchNew %>"><%= watchNew %></span><% } %></a>
+  <a class="<%= currentPath === '/posts/new' ? 'active' : '' %>" href="<%= user ? '/posts/new' : '/login?next=/posts/new' %>">發文</a>
+  <a class="<%= currentPath === '/me' ? 'active' : '' %>" href="<%= user ? '/me' : '/login?next=/me' %>">我的交易<% if (user && actionCount) { %> (<%= actionCount %>)<% } %><% if (ratingReminders && ratingReminders.total) { %><span class="tab-badge" data-rating-due="<%= ratingReminders.total %>"><%= ratingReminders.total %></span><% } %><% if (user && expiringCount) { %><span class="tab-badge tab-badge-soon" data-expiring="<%= expiringCount %>"><%= expiringCount %></span><% } %></a>
+  <a class="<%= currentPath === '/account' ? 'active' : '' %>" href="<%= user ? '/account' : '/login?next=/account' %>">我的帳號</a>
+</nav>
+<% if ((typeof clearDraft !== 'undefined' && clearDraft) || currentPath === '/posts/new') { %>
+<script src="<%= asset('/draft.js') %>"></script>
+<% } %>
+<% if (currentPath === '/' || currentPath === '/account' || currentPath === '/posts/new') { %>
+<script src="<%= asset('/districts.js') %>"></script>
+<% } %>
+<script src="<%= asset('/pwa.js') %>" data-sw="<%= asset('/sw.js') %>"></script>
+<script src="<%= asset('/large-text.js') %>"></script>
+<% if (currentPath === '/' && ratingReminders && ratingReminders.total) { %>
+<script src="<%= asset('/rating-remind.js') %>"></script>
+<% } %>
+</body>
+</html>

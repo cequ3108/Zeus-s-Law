@@ -1,0 +1,56 @@
+<% if (!model.questions.concealed) { %>
+<section class="qa" id="qa">
+  <h2>問與答<% if (model.questions.publicCount) { %> <span class="tag tag-qa">問答 <%= model.questions.publicCount %></span><% } %></h2>
+  <% if (!model.questions.open) { %>
+    <p class="hint">這則已經結束，問答只能看。</p>
+  <% } %>
+  <% if (!model.questions.items.length) { %>
+    <p class="empty">還沒有人提問。</p>
+  <% } %>
+  <% model.questions.items.forEach(function (item) { %>
+    <article class="qa-item" data-question="<%= item.id %>">
+      <p class="meta">
+        <a href="/users/<%= item.asker.id %>"><%= item.asker.name %></a>
+        · <%= formatTaipei(item.createdAt) %>
+        <% if (item.hidden) { %><span class="tag">已隱藏</span><% } %>
+      </p>
+      <p><%= item.question %></p>
+      <% if (item.answer) { %>
+        <p class="answer"><strong>發文者回覆</strong> <%= item.answer %></p>
+      <% } else if (item.canAnswer) { %>
+        <form method="post" action="/posts/<%= model.id %>/questions/<%= item.id %>/answer">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <label for="answer-<%= item.id %>">回覆</label>
+          <textarea id="answer-<%= item.id %>" name="answer" maxlength="150" required></textarea>
+          <button type="submit">送出回覆</button>
+        </form>
+      <% } %>
+      <% if (item.canHide) { %>
+        <form method="post" action="/posts/<%= model.id %>/questions/<%= item.id %>/hide">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="secondary" type="submit">隱藏這則提問</button>
+        </form>
+      <% } %>
+      <% if (item.canDelete) { %>
+        <form method="post" action="/posts/<%= model.id %>/questions/<%= item.id %>/delete">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="secondary" type="submit">刪除</button>
+        </form>
+      <% } %>
+    </article>
+  <% }) %>
+  <% if (model.questions.canAsk) { %>
+    <form method="post" action="/posts/<%= model.id %>/questions">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="question">公開提問</label>
+        <textarea id="question" name="question" maxlength="150" required></textarea>
+        <p class="hint">最多 150 字。同一則 24 小時內最多問 3 次。</p>
+      </div>
+      <button type="submit">送出提問</button>
+    </form>
+  <% } else if (model.questions.open && !model.loggedIn) { %>
+    <p><a class="button" href="/login?next=/posts/<%= model.id %>%23qa">登入後提問</a></p>
+  <% } %>
+</section>
+<% } %>

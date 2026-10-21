@@ -1,0 +1,400 @@
+const fs = require('fs');
+const path = require('path');
+const Database = require('better-sqlite3');
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY,
+  mobile TEXT NOT NULL UNIQUE,
+  display_name TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('user', 'org', 'founder')),
+  merit INTEGER NOT NULL,
+  quota INTEGER NOT NULL,
+  blocked INTEGER NOT NULL DEFAULT 0 CHECK (blocked IN (0, 1)),
+  block_reason TEXT,
+  password_hash TEXT,
+  city TEXT,
+  district TEXT,
+  availability TEXT,
+  slots TEXT,
+  rules_acknowledged_at TEXT,
+  last_seen_at TEXT,
+  hide_last_seen INTEGER NOT NULL DEFAULT 0 CHECK (hide_last_seen IN (0, 1)),
+  onboarding_dismissed_at TEXT,
+  created_at TEXT NOT NULL,
+  CHECK (merit >= 0),
+  CHECK (quota >= 0),
+  CHECK (merit <= quota)
+);
+
+CREATE TABLE IF NOT EXISTS otp_codes (
+  id INTEGER PRIMARY KEY,
+  mobile TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  consumed INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_otp_mobile ON otp_codes (mobile, created_at);
+
+CREATE TABLE IF NOT EXISTS org_applications (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  org_name TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS posts (
+  id INTEGER PRIMARY KEY,
+  author_id INTEGER NOT NULL REFERENCES users(id),
+  kind TEXT NOT NULL CHECK (kind IN ('offer', 'need')),
+  category TEXT NOT NULL CHECK (category IN ('food', 'transport', 'other')),
+  description TEXT NOT NULL,
+  title TEXT,
+  amount INTEGER NOT NULL CHECK (amount > 0),
+  status TEXT NOT NULL CHECK (status IN ('open', 'matched', 'settled', 'cancelled')),
+  accepter_id INTEGER REFERENCES users(id),
+  host_id INTEGER REFERENCES users(id),
+  seeker_id INTEGER REFERENCES users(id),
+  host_value INTEGER CHECK (host_value IS NULL OR host_value >= 0),
+  seeker_value INTEGER CHECK (seeker_value IS NULL OR seeker_value >= 0),
+  settled_amount INTEGER CHECK (settled_amount IS NULL OR settled_amount >= 0),
+  settled_on TEXT,
+  created_at TEXT NOT NULL,
+  matched_at TEXT,
+  settled_at TEXT,
+  city TEXT,
+  district TEXT,
+  expires_at TEXT,
+  meeting_place TEXT,
+  meeting_time TEXT,
+  meeting_mode TEXT,
+  slots TEXT,
+  extended_count INTEGER NOT NULL DEFAULT 0,
+  seats INTEGER NOT NULL DEFAULT 1,
+  filled_count INTEGER NOT NULL DEFAULT 0,
+  reserved_merit INTEGER NOT NULL DEFAULT 0,
+  parent_id INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_posts_status ON posts (status, id);
+CREATE INDEX IF NOT EXISTS idx_posts_author ON posts (author_id);
+CREATE INDEX IF NOT EXISTS idx_posts_accepter ON posts (accepter_id);
+
+CREATE TABLE IF NOT EXISTS post_slots (
+  id INTEGER PRIMARY KEY,
+  post_id INTEGER NOT NULL REFERENCES posts(id),
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  child_post_id INTEGER NOT NULL REFERENCES posts(id),
+  status TEXT NOT NULL CHECK (status IN ('accepted', 'removed', 'settled')),
+  accepted_at TEXT NOT NULL,
+  removed_at TEXT,
+  UNIQUE (post_id, user_id),
+  UNIQUE (child_post_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_post_slots_post ON post_slots (post_id, status, id);
+
+CREATE TABLE IF NOT EXISTS post_questions (
+  id INTEGER PRIMARY KEY,
+  post_id INTEGER NOT NULL REFERENCES posts(id),
+  asker_id INTEGER NOT NULL REFERENCES users(id),
+  question TEXT NOT NULL,
+  answer TEXT,
+  answered_at TEXT,
+  hidden_at TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_post_questions_post ON post_questions (post_id, created_at, id);
+
+CREATE TABLE IF NOT EXISTS daily_settlements (
+  id INTEGER PRIMARY KEY,
+  user_lo INTEGER NOT NULL REFERENCES users(id),
+  user_hi INTEGER NOT NULL REFERENCES users(id),
+  taipei_date TEXT NOT NULL,
+  post_id INTEGER NOT NULL UNIQUE REFERENCES posts(id),
+  amount INTEGER NOT NULL CHECK (amount >= 0),
+  UNIQUE (user_lo, user_hi, taipei_date)
+);
+
+CREATE TABLE IF NOT EXISTS ratings (
+  id INTEGER PRIMARY KEY,
+  post_id INTEGER NOT NULL REFERENCES posts(id),
+  rater_id INTEGER NOT NULL REFERENCES users(id),
+  ratee_id INTEGER NOT NULL REFERENCES users(id),
+  stars INTEGER NOT NULL CHECK (stars BETWEEN 1 AND 5),
+  comment TEXT,
+  created_at TEXT NOT NULL,
+  UNIQUE (post_id, rater_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ratings_ratee ON ratings (ratee_id);
+
+CREATE TABLE IF NOT EXISTS rating_tags (
+  id INTEGER PRIMARY KEY,
+  rating_id INTEGER NOT NULL REFERENCES ratings(id),
+  tag TEXT NOT NULL,
+  UNIQUE (rating_id, tag)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rating_tags_tag ON rating_tags (tag);
+
+CREATE TABLE IF NOT EXISTS bookmarks (
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  post_id INTEGER NOT NULL REFERENCES posts(id),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, post_id)
+);
+
+CREATE TABLE IF NOT EXISTS thanks (
+  id INTEGER PRIMARY KEY,
+  post_id INTEGER NOT NULL REFERENCES posts(id),
+  author_id INTEGER NOT NULL REFERENCES users(id),
+  recipient_id INTEGER NOT NULL REFERENCES users(id),
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  hidden_at TEXT,
+  UNIQUE (post_id, author_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_thanks_recipient ON thanks (recipient_id, created_at);
+
+CREATE TABLE IF NOT EXISTS ledger (
+  id INTEGER PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  delta_merit INTEGER NOT NULL,
+  delta_quota INTEGER NOT NULL,
+  merit_after INTEGER NOT NULL,
+  quota_after INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  post_id INTEGER REFERENCES posts(id),
+  counterparty_id INTEGER REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ledger_user ON ledger (user_id, id);
+CREATE INDEX IF NOT EXISTS idx_ledger_user_time ON ledger (user_id, created_at, id);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  sid TEXT PRIMARY KEY,
+  sess TEXT NOT NULL,
+  expire INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_expire ON sessions (expire);
+
+CREATE TABLE IF NOT EXISTS user_hides (
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  hidden_user_id INTEGER NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, hidden_user_id),
+  CHECK (user_id != hidden_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_hides_hidden ON user_hides (hidden_user_id);
+
+CREATE TABLE IF NOT EXISTS user_watch_prefs (
+  user_id INTEGER PRIMARY KEY,
+  categories TEXT,
+  counties TEXT,
+  last_checked_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS reports (
+  id INTEGER PRIMARY KEY,
+  reporter_id INTEGER NOT NULL REFERENCES users(id),
+  target_type TEXT NOT NULL CHECK (target_type IN ('post', 'user')),
+  target_id INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  note TEXT,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'dismissed')),
+  created_at TEXT NOT NULL,
+  handled_at TEXT,
+  handled_by INTEGER REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (status, created_at, id);
+CREATE INDEX IF NOT EXISTS idx_reports_target ON reports (target_type, target_id);
+
+CREATE TABLE IF NOT EXISTS announcements (
+  id INTEGER PRIMARY KEY,
+  author_id INTEGER NOT NULL REFERENCES users(id),
+  title TEXT,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  removed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS announcement_dismissals (
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  announcement_id INTEGER NOT NULL REFERENCES announcements(id),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, announcement_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS ledger_no_update
+BEFORE UPDATE ON ledger
+BEGIN
+  SELECT RAISE(ABORT, 'ledger is append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS ledger_no_delete
+BEFORE DELETE ON ledger
+BEGIN
+  SELECT RAISE(ABORT, 'ledger is append-only');
+END;
+`;
+
+function resolveDbPath(env = process.env) {
+  if (env.DB_PATH) return env.DB_PATH;
+  const dir = env.DATA_DIR || path.join(__dirname, '..', 'data');
+  return path.join(dir, 'zeus.db');
+}
+
+function columnNames(db, table) {
+  return new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((column) => column.name));
+}
+
+function addColumn(db, table, column, definition) {
+  if (!columnNames(db, table).has(column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+function migrate(db) {
+  addColumn(db, 'users', 'password_hash', 'TEXT');
+  addColumn(db, 'users', 'city', 'TEXT');
+  addColumn(db, 'users', 'district', 'TEXT');
+  addColumn(db, 'users', 'availability', 'TEXT');
+  addColumn(db, 'users', 'slots', 'TEXT');
+  addColumn(db, 'users', 'rules_acknowledged_at', 'TEXT');
+  addColumn(db, 'users', 'last_seen_at', 'TEXT');
+  addColumn(db, 'users', 'hide_last_seen', 'INTEGER NOT NULL DEFAULT 0');
+  addColumn(db, 'users', 'onboarding_dismissed_at', 'TEXT');
+  addColumn(db, 'posts', 'city', 'TEXT');
+  addColumn(db, 'posts', 'district', 'TEXT');
+  addColumn(db, 'posts', 'title', 'TEXT');
+  addColumn(db, 'posts', 'expires_at', 'TEXT');
+  addColumn(db, 'posts', 'meeting_place', 'TEXT');
+  addColumn(db, 'posts', 'meeting_time', 'TEXT');
+  addColumn(db, 'posts', 'meeting_mode', 'TEXT');
+  addColumn(db, 'posts', 'slots', 'TEXT');
+  addColumn(db, 'posts', 'extended_count', 'INTEGER NOT NULL DEFAULT 0');
+  addColumn(db, 'posts', 'seats', 'INTEGER NOT NULL DEFAULT 1');
+  addColumn(db, 'posts', 'filled_count', 'INTEGER NOT NULL DEFAULT 0');
+  addColumn(db, 'posts', 'reserved_merit', 'INTEGER NOT NULL DEFAULT 0');
+  addColumn(db, 'posts', 'parent_id', 'INTEGER');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_hides (
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      hidden_user_id INTEGER NOT NULL REFERENCES users(id),
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, hidden_user_id),
+      CHECK (user_id != hidden_user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_hides_hidden ON user_hides (hidden_user_id);
+    CREATE TABLE IF NOT EXISTS user_watch_prefs (
+      user_id INTEGER PRIMARY KEY,
+      categories TEXT,
+      counties TEXT,
+      last_checked_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS announcements (
+      id INTEGER PRIMARY KEY,
+      author_id INTEGER NOT NULL REFERENCES users(id),
+      title TEXT,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      removed_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS announcement_dismissals (
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      announcement_id INTEGER NOT NULL REFERENCES announcements(id),
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, announcement_id)
+    );
+    CREATE TABLE IF NOT EXISTS rating_tags (
+      id INTEGER PRIMARY KEY,
+      rating_id INTEGER NOT NULL REFERENCES ratings(id),
+      tag TEXT NOT NULL,
+      UNIQUE (rating_id, tag)
+    );
+    CREATE INDEX IF NOT EXISTS idx_rating_tags_tag ON rating_tags (tag);
+    CREATE TABLE IF NOT EXISTS bookmarks (
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      post_id INTEGER NOT NULL REFERENCES posts(id),
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, post_id)
+    );
+    CREATE TABLE IF NOT EXISTS thanks (
+      id INTEGER PRIMARY KEY,
+      post_id INTEGER NOT NULL REFERENCES posts(id),
+      author_id INTEGER NOT NULL REFERENCES users(id),
+      recipient_id INTEGER NOT NULL REFERENCES users(id),
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      hidden_at TEXT,
+      UNIQUE (post_id, author_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_thanks_recipient ON thanks (recipient_id, created_at);
+    CREATE TABLE IF NOT EXISTS reports (
+      id INTEGER PRIMARY KEY,
+      reporter_id INTEGER NOT NULL REFERENCES users(id),
+      target_type TEXT NOT NULL CHECK (target_type IN ('post', 'user')),
+      target_id INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      note TEXT,
+      status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'dismissed')),
+      created_at TEXT NOT NULL,
+      handled_at TEXT,
+      handled_by INTEGER REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (status, created_at, id);
+    CREATE INDEX IF NOT EXISTS idx_reports_target ON reports (target_type, target_id);
+    CREATE INDEX IF NOT EXISTS idx_ledger_user_time ON ledger (user_id, created_at, id);
+    CREATE TABLE IF NOT EXISTS post_questions (
+      id INTEGER PRIMARY KEY,
+      post_id INTEGER NOT NULL REFERENCES posts(id),
+      asker_id INTEGER NOT NULL REFERENCES users(id),
+      question TEXT NOT NULL,
+      answer TEXT,
+      answered_at TEXT,
+      hidden_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_post_questions_post ON post_questions (post_id, created_at, id);
+    CREATE TABLE IF NOT EXISTS post_slots (
+      id INTEGER PRIMARY KEY,
+      post_id INTEGER NOT NULL REFERENCES posts(id),
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      child_post_id INTEGER NOT NULL REFERENCES posts(id),
+      status TEXT NOT NULL CHECK (status IN ('accepted', 'removed', 'settled')),
+      accepted_at TEXT NOT NULL,
+      removed_at TEXT,
+      UNIQUE (post_id, user_id),
+      UNIQUE (child_post_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_post_slots_post ON post_slots (post_id, status, id);
+  `);
+}
+
+function openDatabase(dbPath) {
+  if (dbPath !== ':memory:') {
+    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+  }
+  const db = new Database(dbPath);
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  db.exec(SCHEMA);
+  migrate(db);
+  return db;
+}
+
+module.exports = { openDatabase, resolveDbPath, migrate };

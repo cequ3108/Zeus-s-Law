@@ -1,0 +1,28 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap narrow">
+  <h1>登入</h1>
+  <section class="card auth-card">
+    <form method="post" action="/login/password" autocomplete="on">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="login_mobile">手機號碼</label>
+        <input id="login_mobile" name="mobile" type="tel" inputmode="numeric" autocomplete="username" placeholder="0912345678" value="<%= rememberedMobile %>" required>
+      </div>
+      <div class="field">
+        <label for="login_password">密碼</label>
+        <input id="login_password" name="password" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="primary-action" type="submit">登入</button>
+      <label class="check remember" for="remember">
+        <input id="remember" type="checkbox" name="remember" value="1" checked>
+        <span>記住我</span>
+      </label>
+    </form>
+    <div class="login-links">
+      <a href="/join">建立帳號</a>
+      <a href="/forgot">忘記密碼</a>
+    </div>
+  </section>
+</main>
+<%- include('partials/footer') %>

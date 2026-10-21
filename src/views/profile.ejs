@@ -1,0 +1,129 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap">
+  <h1><%= profile.user.display_name %><%- include('partials/last-seen', { label: profile.lastSeen }) %></h1>
+  <% if (own) { %>
+    <form class="last-seen-form" method="post" action="/account/last-seen">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="return" value="/users/<%= profile.user.id %>">
+      <label class="check" for="hide_last_seen">
+        <input id="hide_last_seen" type="checkbox" name="hide_last_seen" value="1" <%= profile.hideLastSeen ? 'checked' : '' %>>
+        不顯示我的上線狀態
+      </label>
+      <button type="submit">儲存</button>
+    </form>
+  <% } %>
+  <p class="meta">
+    <%= roleLabel(profile.user.role) %>
+    · 加入於 <%= formatTaipei(profile.user.created_at) %>
+    <% if (profile.user.city) { %> · <%= placeLabel(profile.user.city, profile.user.district) %><% } %>
+    <% if (profile.user.blocked) { %> · 此帳號已被封鎖，不能發布或接下<% } %>
+  </p>
+  <% if (profile.user.availability) { %>
+    <p>今日空檔：<%= profile.user.availability %></p>
+  <% } %>
+  <% if (parseSlots(profile.user.slots).length) { %>
+    <p class="slot-line">方便互助時段 <%- include('partials/slot-tags', { value: profile.user.slots }) %></p>
+  <% } %>
+  <% if (canHide) { %>
+    <form class="hide-form" method="post" action="/users/<%= profile.user.id %>/hide">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="secondary" type="submit">不想再遇到這個人</button>
+    </form>
+  <% } %>
+  <% if (own) { %>
+    <section class="balances" aria-label="我的餘額">
+      <article class="card balance">
+        <p>功德額度</p>
+        <strong data-quota="<%= own.quota %>"><%= formatMerit(own.quota) %></strong>
+      </article>
+      <article class="card balance">
+        <p>功德</p>
+        <strong data-merit="<%= own.merit %>"><a href="/users/<%= profile.user.id %>/merit"><%= formatMerit(own.merit) %></a></strong>
+      </article>
+    </section>
+  <% } %>
+  <section class="card" data-helped="<%= profile.reputation.helped %>" data-helped-by="<%= profile.reputation.helpedBy %>" data-rating-count="<%= profile.ratingCount %>" data-rating-avg="<%= profile.ratingAvg == null ? '' : profile.ratingAvg %>">
+    <h2>信譽</h2>
+    <p>幫過別人 <%= profile.reputation.helped %> 次 · 被幫過 <%= profile.reputation.helpedBy %> 次</p>
+    <% if (profile.reputation.badges.length) { %>
+      <p>
+        <% profile.reputation.badges.forEach(function (badge) { %>
+          <span class="tag"><%= badge %></span>
+        <% }) %>
+      </p>
+    <% } else { %>
+      <p class="hint">完成互助之後，這裡會出現徽章。徽章不另發功德。</p>
+    <% } %>
+  </section>
+  <section class="card" data-completed="<%= profile.milestones.completed %>" data-fives="<%= profile.milestones.fives %>" aria-label="互助里程碑">
+    <h2>互助里程碑</h2>
+    <% profile.milestones.badges.forEach(function (badge) { %>
+      <p class="milestone<%= badge.earned ? ' is-earned' : ' is-locked' %>" data-milestone="<%= badge.id %>" data-earned="<%= badge.earned ? '1' : '0' %>">
+        <span class="tag"><%= badge.label %></span>
+        <%= badge.criterion %>
+        <% if (badge.earned) { %> · 已達成<% } else { %> · 還差 <%= badge.remaining %><%= badge.unit %><% } %>
+      </p>
+    <% }) %>
+  </section>
+  <section class="card" data-rating-count="<%= profile.ratingCount %>" data-rating-avg="<%= profile.ratingAvg == null ? '' : profile.ratingAvg %>">
+    <h2>星等</h2>
+    <% if (profile.ratingCount) { %>
+      <p class="stars big-stars"><%= starGlyph(profile.ratingAvg) %></p>
+      <p>平均 <%= profile.ratingAvg %> / 5，共 <%= profile.ratingCount %> 則。</p>
+      <% if (profile.tags.length) { %>
+        <p class="tag-counts" aria-label="評價標籤">
+          <% profile.tags.forEach(function (item) { %>
+            <span class="tag"><%= item.tag %> ×<%= item.count %></span>
+          <% }) %>
+        </p>
+      <% } %>
+    <% } else { %>
+      <p>尚無星等。</p>
+    <% } %>
+  </section>
+  <section class="card thanks" aria-label="收到的感謝" data-thanks="<%= profile.noteTotal %>">
+    <h2>收到的感謝</h2>
+    <% if (!profile.notes.length) { %>
+      <p class="empty">還沒有公開的感謝。</p>
+    <% } %>
+    <% profile.notes.forEach(function (note) { %>
+      <article data-thanks-id="<%= note.id %>" data-hidden="<%= note.hidden ? '1' : '0' %>">
+        <p><%= note.body %></p>
+        <p class="meta">
+          <a href="/users/<%= note.authorId %>"><%= note.authorName %></a>
+          · <%= categoryLabel(note.category) %>
+          · <%= formatTaipei(note.createdAt) %>
+          <% if (note.hidden) { %> · 已不公開<% } %>
+        </p>
+        <% if (own && !note.hidden) { %>
+          <form method="post" action="/thanks/<%= note.id %>/hide">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <input type="hidden" name="return" value="/users/<%= profile.user.id %>">
+            <button class="secondary" type="submit">不公開這則感謝</button>
+          </form>
+        <% } %>
+      </article>
+    <% }) %>
+    <% if (!profile.thanksAll && profile.noteTotal > profile.notes.length) { %>
+      <p><a class="button" href="/users/<%= profile.user.id %>?thanks=all">看更多感謝</a></p>
+    <% } %>
+  </section>
+  <% if (profile.ratings.length) { %>
+    <h2>收到的星等</h2>
+    <% profile.ratings.forEach(function (rating) { %>
+      <article class="card">
+        <p class="stars"><%= starGlyph(rating.stars) %> <%= rating.stars %> 星</p>
+        <p class="meta">
+          <a href="/users/<%= rating.rater_id %>"><%= rating.rater_name %></a>
+          · <%= formatTaipei(rating.created_at) %>
+        </p>
+      </article>
+    <% }) %>
+  <% } %>
+  <% if (!own) { %>
+    <p class="report-link"><a href="/users/<%= profile.user.id %>/report">檢舉</a></p>
+  <% } %>
+  <p><a href="/rules">規則與常見問題</a></p>
+</main>
+<%- include('partials/footer') %>

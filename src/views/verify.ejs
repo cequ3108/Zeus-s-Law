@@ -1,0 +1,22 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap narrow">
+  <h1>輸入驗證碼</h1>
+  <p>驗證碼已發給 <strong><%= mobile %></strong>，10 分鐘內有效。</p>
+  <% if (devCode) { %>
+    <aside class="dev-code">
+      <p>示範站的開發模式驗證碼。沒有送出簡訊。正式環境不會出現這一段。</p>
+      <p id="dev-code"><%= devCode %></p>
+    </aside>
+  <% } %>
+  <form method="post" action="/verify">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="field">
+      <label for="code">6 位數驗證碼</label>
+      <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" minlength="6" maxlength="6" required>
+    </div>
+    <button type="submit">確認</button>
+  </form>
+  <p class="hint"><a href="/login">換成別的手機號碼</a></p>
+</main>
+<%- include('partials/footer') %>

@@ -1,0 +1,12 @@
+<fieldset class="field slot-picks">
+  <legend><%= legend %></legend>
+  <div class="slot-grid">
+    <% slots.forEach(function (slot) { %>
+      <label class="choice">
+        <input type="checkbox" name="slots" value="<%= slot %>" <%= picked.indexOf(slot) >= 0 ? 'checked' : '' %>>
+        <%= slot %>
+      </label>
+    <% }) %>
+  </div>
+  <% if (hint) { %><p class="hint"><%= hint %></p><% } %>
+</fieldset>

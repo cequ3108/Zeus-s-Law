@@ -1,0 +1,8 @@
+<% if (canExtend) { %>
+<form class="extend-actions" method="post" action="/posts/<%= postId %>/extend">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <% if (returnTo) { %><input type="hidden" name="return" value="<%= returnTo %>"><% } %>
+  <button type="submit" name="days" value="3">延長3天</button>
+  <button class="secondary" type="submit" name="days" value="7">延長7天</button>
+</form>
+<% } %>

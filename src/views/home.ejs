@@ -1,0 +1,184 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap">
+  <% if (user && watchNew) { %>
+    <form class="watch-card" method="post" action="/watch/check" data-watch-new="<%= watchNew %>">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button type="submit">自上次查看後有 <%= watchNew %> 則符合你關注的新貼文</button>
+    </form>
+  <% } %>
+  <% if (announcement) { %>
+    <aside class="announcement" data-announcement="<%= announcement.id %>" aria-label="站內公告">
+      <p>
+        <% if (announcement.title) { %><strong><%= announcement.title %></strong> <% } %><%= announcement.body %>
+      </p>
+      <% if (user) { %>
+        <form method="post" action="/announcements/<%= announcement.id %>/dismiss">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="secondary" type="submit">知道了</button>
+        </form>
+      <% } %>
+    </aside>
+  <% } %>
+  <% if (ratingReminders && ratingReminders.total) { %>
+    <aside class="rating-remind" data-rating-remind="<%= ratingReminders.total %>" data-remind-user="<%= user.id %>" data-remind-day="<%= ratingReminders.day %>">
+      <p>你有 <%= ratingReminders.total %> 筆互助還沒給對方評分</p>
+      <ol>
+        <% ratingReminders.items.slice(0, 3).forEach(function (item) { %>
+          <li>
+            <a href="<%= item.href %>">
+              <span><%= item.otherName %></span>
+              <span><%= item.title %></span>
+              <time datetime="<%= item.settledAt %>"><%= formatTaipei(item.settledAt) %></time>
+            </a>
+          </li>
+        <% }) %>
+      </ol>
+      <% if (ratingReminders.total > 3) { %>
+        <p><a class="button" href="/me#pending-ratings">查看全部</a></p>
+      <% } %>
+      <button type="button" data-remind-dismiss>稍後再說</button>
+    </aside>
+  <% } %>
+  <% if (onboarding) { %>
+    <details class="onboarding" open data-onboarding="<%= onboarding.complete ? 'complete' : onboarding.done + '/' + onboarding.total %>">
+      <summary>新手上手 <%= onboarding.done %>/<%= onboarding.total %></summary>
+      <% if (onboarding.complete) { %>
+        <p>完成！</p>
+      <% } else { %>
+        <ol>
+          <% onboarding.steps.forEach(function (step) { %>
+            <li class="<%= step.done ? 'is-done' : '' %>" data-step="<%= step.id %>" data-done="<%= step.done ? '1' : '0' %>">
+              <a href="<%= step.href %>"><%= step.label %></a>
+            </li>
+          <% }) %>
+        </ol>
+        <form method="post" action="/onboarding/dismiss">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="secondary" type="submit">先不要顯示</button>
+        </form>
+      <% } %>
+    </details>
+  <% } %>
+  <section class="hero">
+    <h1>今天可以接的互助</h1>
+    <p>食物、交通，或其他需要。你可以寫「我可以提供」，也可以寫「我需要」。標一個功德金額，最後以雙方認定的較低者結算。</p>
+    <form class="filter" method="get" action="/">
+      <% if (filterWatch) { %>
+        <input type="hidden" name="watch" value="1">
+        <p class="hint filter-watch">正在看你關注的類別與縣市。</p>
+      <% } %>
+      <div class="field">
+        <label for="filter-city">縣市</label>
+        <select class="place-select" id="filter-city" name="city">
+          <option value="all" <%= filterCity === 'all' ? 'selected' : '' %>>全部</option>
+          <% cities.forEach(function (city) { %>
+            <option value="<%= city %>" <%= filterCity === city ? 'selected' : '' %>><%= city %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="field">
+        <label for="filter-district">鄉鎮市區</label>
+        <%- include('partials/district-select', {
+          id: 'filter-district',
+          cityId: 'filter-city',
+          blank: '全部',
+          disabled: filterCity === 'all',
+          selectedCity: filterCity,
+          selectedDistrict: filterDistrict
+        }) %>
+      </div>
+      <div class="field">
+        <label for="filter-category">種類</label>
+        <select id="filter-category" name="category">
+          <option value="">全部</option>
+          <option value="food" <%= filterCategory === 'food' ? 'selected' : '' %>>食物</option>
+          <option value="transport" <%= filterCategory === 'transport' ? 'selected' : '' %>>交通</option>
+          <option value="other" <%= filterCategory === 'other' ? 'selected' : '' %>>其他</option>
+        </select>
+      </div>
+      <button type="submit">篩選</button>
+      <label class="check filter-public">
+        <input type="checkbox" name="public" value="1" <%= filterPublic ? 'checked' : '' %>>
+        只看公共場所見面
+      </label>
+      <% if (user && user.city && user.district) { %>
+        <label class="check filter-local">
+          <input type="checkbox" name="local" value="1" <%= filterLocal ? 'checked' : '' %>>
+          只看我的鄉鎮
+        </label>
+      <% } %>
+      <% if (user && parseSlots(user.slots).length) { %>
+        <label class="check filter-fit">
+          <input type="checkbox" name="fit" value="1" <%= filterFit ? 'checked' : '' %>>
+          只看符合我時段
+        </label>
+      <% } else if (user) { %>
+        <p class="hint filter-fit-hint">只看符合我時段要先在<a href="/account">帳號頁</a>選好方便互助時段。</p>
+      <% } %>
+      <div class="search-bar">
+        <div class="field search-field<%= filterQuery ? ' has-clear' : '' %>">
+          <label for="q">搜尋</label>
+          <input id="q" name="q" value="<%= filterQuery %>" maxlength="40" placeholder="搜尋便當、共乘、陪看病…" autocomplete="off">
+          <% if (filterQuery) { %><a class="search-clear" href="<%= searchClearPath %>">清除</a><% } %>
+        </div>
+        <div class="field">
+          <label for="filter-sort">排序</label>
+          <select id="filter-sort" name="sort">
+            <option value="new" <%= filterSort === 'new' ? 'selected' : '' %>>最新發布</option>
+            <option value="amount_desc" <%= filterSort === 'amount_desc' ? 'selected' : '' %>>功德由高到低</option>
+            <option value="amount_asc" <%= filterSort === 'amount_asc' ? 'selected' : '' %>>功德由低到高</option>
+            <option value="expiry" <%= filterSort === 'expiry' ? 'selected' : '' %>>快到期優先</option>
+          </select>
+        </div>
+      </div>
+    </form>
+    <% if (!user) { %>
+      <p><a class="button" href="/login">用手機號碼加入</a></p>
+    <% } else if (!user.blocked) { %>
+      <p><a class="button" href="/posts/new">發布一則</a></p>
+    <% } %>
+  </section>
+
+  <% if (!posts.length && filterQuery) { %>
+    <p class="empty">找不到相符的貼文，換個關鍵字試試</p>
+  <% } else if (!posts.length) { %>
+    <p class="empty">廣場還沒有招募中的貼文。</p>
+  <% } %>
+
+  <div class="post-list">
+    <% posts.forEach(function (post) { %>
+      <article class="card">
+        <div class="card-top">
+        <p class="meta">
+          <span class="tag tag-<%= post.kind %>"><%= kindLabel(post.kind) %></span>
+          <span class="tag"><%= categoryLabel(post.category) %></span>
+          <% if (post.city) { %><span class="tag"><%= placeLabel(post.city, post.district) %></span><% } %>
+          <% if (post.meeting_mode) { %><span class="tag" data-meeting-mode="<%= post.meeting_mode %>"><%= post.meeting_mode %></span><% } %>
+          <%- include('partials/slot-tags', { value: post.slots }) %>
+          <% if (post.question_count) { %><span class="tag tag-qa">問答 <%= post.question_count %></span><% } %>
+          <% if (post.seats > 1) { %><span class="tag tag-crew">已錄取 <%= post.filled_count %>／<%= post.seats %></span><% } %>
+          <span>標示 <%= formatMerit(post.amount) %> 功德</span>
+        </p>
+        <% if (user && !user.blocked) { %>
+          <%- include('partials/bookmark', { postId: post.id, saved: !!post.bookmarked, returnTo: '/' }) %>
+        <% } %>
+        </div>
+        <h2><a href="/posts/<%= post.id %>"><%= post.title || (kindLabel(post.kind) + ' · ' + categoryLabel(post.category)) %></a></h2>
+        <p class="excerpt"><%= post.description %></p>
+        <p class="meta">
+          <a href="/users/<%= post.author_id %>"><%= post.author_name %></a><%- include('partials/mini-badge', { badge: post.author_badge }) %><%- include('partials/last-seen', { label: post.author_seen }) %>
+          · <%= roleLabel(post.author_role) %>
+          <% if (post.author_count) { %>
+            · <span class="stars"><%= starGlyph(post.author_avg) %></span> <%= post.author_avg %>
+          <% } else { %>
+            · 尚無星等
+          <% } %>
+          · 幫過 <%= post.author_helped %> 次
+          <% if (post.author_availability) { %> · 今日空檔 <%= post.author_availability %><% } %>
+        </p>
+      </article>
+    <% }) %>
+  </div>
+</main>
+<%- include('partials/footer') %>

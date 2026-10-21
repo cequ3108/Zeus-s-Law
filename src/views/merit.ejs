@@ -1,0 +1,55 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap">
+  <h1>我的功德明細</h1>
+  <section class="balances" aria-label="目前餘額">
+    <article class="card balance">
+      <p>功德</p>
+      <strong data-merit="<%= history.merit %>"><%= formatMerit(history.merit) %></strong>
+    </article>
+    <article class="card balance">
+      <p>功德額度</p>
+      <strong data-quota="<%= history.quota %>"><%= formatMerit(history.quota) %></strong>
+    </article>
+  </section>
+  <p>
+    本月收到 <strong data-month-received="<%= history.received %>"><%= formatMerit(history.received) %></strong>
+    · 本月付出 <strong data-month-paid="<%= history.paid %>"><%= formatMerit(history.paid) %></strong>
+  </p>
+  <p class="hint">本月收到和付出只算這個月的結算。註冊和創辦人、機構發放另外列在下面。多人任務的「預留功德」是先扣起來、還沒付出；「退回預留」是沒用到而退回；「預留轉入結算」之後的「結算支出」才是真正付出。</p>
+  <form class="merit-filter" method="get" action="/users/<%= user.id %>/merit">
+    <div class="field">
+      <label for="month">月份</label>
+      <select id="month" name="month">
+        <option value="">全部</option>
+        <% history.months.forEach(function (month) { %>
+          <option value="<%= month %>" <%= history.month === month ? 'selected' : '' %>><%= month.slice(0, 4) %>年<%= Number(month.slice(5)) %>月</option>
+        <% }) %>
+      </select>
+    </div>
+    <button type="submit">篩選</button>
+  </form>
+  <% if (!history.items.length) { %>
+    <p class="empty"><%= history.month ? '這個月還沒有功德進出。' : '還沒有功德進出。' %></p>
+  <% } %>
+  <ol class="merit-list">
+    <% history.items.forEach(function (row) { %>
+      <li data-ledger="<%= row.id %>" data-merit-after="<%= row.meritAfter %>" data-delta="<%= row.deltaMerit %>" data-type="<%= row.type %>">
+        <p class="meta"><time datetime="<%= row.at %>"><%= formatTaipei(row.at) %></time></p>
+        <p><%= row.type %></p>
+        <% if (row.counterpartyId) { %>
+          <p><a href="/users/<%= row.counterpartyId %>"><%= row.counterpartyName %></a></p>
+        <% } %>
+        <p class="delta<%= row.deltaMerit > 0 ? ' is-plus' : (row.deltaMerit < 0 ? ' is-minus' : '') %>">
+          <% if (row.deltaMerit > 0) { %>+<% } %><%= formatMerit(row.deltaMerit) %>
+        </p>
+        <p>額度 +<%= formatMerit(row.deltaQuota) %></p>
+        <p>餘額 <%= formatMerit(row.meritAfter) %></p>
+      </li>
+    <% }) %>
+  </ol>
+  <% if (history.hasMore) { %>
+    <p><a class="button merit-more" href="/users/<%= user.id %>/merit?before=<%= history.nextBefore %><%= history.month ? '&month=' + history.month : '' %>">載入更多</a></p>
+  <% } %>
+</main>
+<%- include('partials/footer') %>

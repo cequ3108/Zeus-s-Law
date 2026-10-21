@@ -1,0 +1,112 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap">
+  <h1>我的交易<% if (dash.actionCount) { %> (<%= dash.actionCount %>)<% } %></h1>
+  <p class="meta"><%= dash.user.display_name %></p>
+  <p class="meta"><%= roleLabel(dash.user.role) %> · <%= dash.user.mobile %></p>
+  <section class="balances" aria-label="餘額">
+    <article class="card balance">
+      <p>功德額度</p>
+      <strong data-quota="<%= dash.user.quota %>"><%= formatMerit(dash.user.quota) %></strong>
+      <p class="hint">只會增加，不會減少。1 點等於 1 元新台幣。</p>
+    </article>
+    <article class="card balance">
+      <p>功德</p>
+      <strong data-merit="<%= dash.user.merit %>"><%= formatMerit(dash.user.merit) %></strong>
+      <p class="hint">現在能流動的餘額。不能超過額度，也不能變成負數。</p>
+    </article>
+  </section>
+  <p class="meta">
+    <% if (dash.ratingCount) { %>
+      星等 <span class="stars"><%= starGlyph(dash.ratingAvg) %></span> <%= dash.ratingAvg %>（<%= dash.ratingCount %> 則）
+    <% } else { %>
+      還沒有人給你星等。
+    <% } %>
+    · <a href="/users/<%= dash.user.id %>">看個人頁</a>
+  </p>
+  <% if (dash.user.role === 'user' && !dash.user.blocked) { %>
+    <p><a href="/org/apply">申請成為福利機構</a></p>
+  <% } %>
+  <% if (!dash.user.blocked) { %>
+    <p><a class="button" href="/posts/new">發布一則</a></p>
+  <% } %>
+
+  <% if (ratingReminders && ratingReminders.total) { %>
+    <h2 id="pending-ratings">待評分</h2>
+    <ol class="rating-due" data-rating-due-list="<%= ratingReminders.total %>">
+      <% ratingReminders.items.forEach(function (item) { %>
+        <li>
+          <a href="<%= item.href %>"><%= item.otherName %> · <%= item.title %> · <%= formatTaipei(item.settledAt) %></a>
+        </li>
+      <% }) %>
+    </ol>
+  <% } %>
+
+  <h2>我封鎖的人</h2>
+  <% if (!dash.hidden.length) { %>
+    <p class="empty">目前沒有。</p>
+  <% } %>
+  <% dash.hidden.forEach(function (person) { %>
+    <article class="pending">
+      <p><a href="/users/<%= person.id %>"><%= person.display_name %></a></p>
+      <form method="post" action="/users/<%= person.id %>/unhide">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="secondary" type="submit">解除</button>
+      </form>
+    </article>
+  <% }) %>
+
+  <h2>我的收藏</h2>
+  <% if (!dash.bookmarks.length) { %>
+    <p class="empty">目前沒有。</p>
+  <% } %>
+  <% dash.bookmarks.forEach(function (item) { %>
+    <article class="card<%= item.closed ? ' is-closed' : '' %>">
+      <p class="meta">
+        <span><%= item.expired ? '已過期' : statusLabel(item.status) %></span>
+        · <%= item.author_name %><%- include('partials/mini-badge', { badge: item.author_badge }) %>
+      </p>
+      <h3><a href="/posts/<%= item.id %>"><%= item.title || item.description.slice(0, 42) %></a></h3>
+      <form class="bookmark-form" method="post" action="/posts/<%= item.id %>/bookmark">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <input type="hidden" name="return" value="/me">
+        <button class="secondary" type="submit">取消收藏</button>
+      </form>
+    </article>
+  <% }) %>
+
+  <h2>我參與的互助</h2>
+  <% if (!dash.posts.length) { %>
+    <p class="empty">你還沒有發布或接下任何一則。</p>
+  <% } %>
+  <% dash.posts.forEach(function (post) { %>
+    <article class="card">
+      <p class="meta">
+        <span class="tag tag-<%= post.kind %>"><%= kindLabel(post.kind) %></span>
+        <% if (post.task) { %><span class="tag tag-task" data-task="<%= post.task %>"><%= post.task %></span><% } %>
+        <span><%= post.expired ? '已過期' : statusLabel(post.status) %></span>
+        <span>標示 <%= formatMerit(post.amount) %></span>
+        <% if (post.settled_amount != null) { %><span>結算 <%= formatMerit(post.settled_amount) %></span><% } %>
+        <% if (post.author_id === dash.user.id && post.unanswered) { %><span class="tag tag-task">未回覆 <%= post.unanswered %></span><% } %>
+        <% if (post.author_id === dash.user.id && post.expiringSoon) { %><span class="tag tag-soon">快到期</span><% } %>
+        <% if (post.seats > 1) { %><span class="tag tag-crew">已錄取 <%= post.filled_count %>／<%= post.seats %></span><% } %>
+      </p>
+      <h3><a href="/posts/<%= post.id %><%= post.task === '待評分' ? '#rate' : '' %>"><%= post.title || post.description.slice(0, 42) %></a></h3>
+      <p class="meta">
+        <%= post.author_name %><%- include('partials/mini-badge', { badge: post.author_badge }) %>
+        <% if (post.accepter_name) { %> · <%= post.accepter_name %><%- include('partials/mini-badge', { badge: post.accepter_badge }) %><% } %>
+      </p>
+      <%- include('partials/extend', { canExtend: post.canExtend, postId: post.id, returnTo: '/me' }) %>
+      <% if (post.expired) { %>
+        <form method="post" action="/posts/<%= post.id %>/repost">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button type="submit">一鍵重發</button>
+        </form>
+      <% } %>
+      <% if (post.author_id === dash.user.id && (post.status === 'settled' || post.status === 'cancelled' || post.expired)) { %>
+        <p><a class="button again" href="/posts/new?from=<%= post.id %>">再發一次</a></p>
+      <% } %>
+    </article>
+  <% }) %>
+</main>
+<%- include('partials/footer') %>

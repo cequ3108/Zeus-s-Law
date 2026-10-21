@@ -1,0 +1,23 @@
+{
+  "name": "zeus-s-law",
+  "version": "0.1.0",
+  "private": true,
+  "description": "宙斯法則：台灣互助，功德計價，現金止步",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test",
+    "seed:founder": "node scripts/seed-founder.js",
+    "seed:demo": "node scripts/seed-demo.js",
+    "backup": "node scripts/backup.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "ejs": "^6.0.1",
+    "express": "^4.22.3",
+    "express-session": "^1.19.0"
+  }
+}

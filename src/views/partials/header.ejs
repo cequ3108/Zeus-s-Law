@@ -1,0 +1,57 @@
+<header class="masthead">
+  <div class="wrap masthead-inner">
+    <div>
+      <a class="brand" href="/">宙斯法則</a>
+      <p class="tagline">互助不收現金。功德在人之間流動。</p>
+    </div>
+    <div class="masthead-tools">
+      <button type="button" class="large-text-toggle" data-large-text aria-pressed="false">大字</button>
+      <p class="seal">禁現金</p>
+    </div>
+  </div>
+  <nav class="wrap">
+    <a href="/rules">規則</a>
+    <% if (user) { %>
+      <% if (user.role === 'founder') { %><a href="/admin">管理<% if (openReports) { %> <span class="nav-count" data-open-reports="<%= openReports %>"><%= openReports %></span><% } %></a><% } %>
+      <form class="nav-form" method="post" action="/logout">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button type="submit">登出</button>
+      </form>
+    <% } else { %>
+      <a href="/login">登入</a>
+    <% } %>
+  </nav>
+</header>
+<% if (compactAuth) { %>
+  <div class="cash-banner">禁止現金</div>
+  <% if (devSms) { %><div class="dev-banner">示範站，驗證碼顯示在畫面上</div><% } %>
+<% } else { %>
+  <div class="cash-banner">本平台禁止現金。不准用錢買這份幫助，也不准把功德換成現金。</div>
+  <% if (devSms) { %>
+    <div class="dev-banner">示範站：這是試用環境，不是正式服務。開發模式沒有送出簡訊，驗證碼會直接顯示在畫面上。請不要留下真實個資。</div>
+  <% } %>
+<% } %>
+<% if (user && user.blocked) { %>
+  <div class="blocked-banner">你的帳號已被封鎖<% if (user.block_reason) { %>（<%= user.block_reason %>）<% } %>，不能發布或接下。</div>
+<% } %>
+<% if (flash) { %>
+  <div class="wrap">
+    <p class="flash flash-<%= flash.type %>"><%= flash.message %></p>
+  </div>
+<% } %>
+<% if (user && !user.rules_acknowledged_at) { %>
+  <div class="rules-gate" data-rules-gate role="dialog" aria-labelledby="rules-gate-title">
+    <h2 id="rules-gate-title">先看三件事</h2>
+    <ul>
+      <% rulesHighlights.forEach(function (item) { %>
+        <li><strong><%= item.title %></strong> <%= item.body %></li>
+      <% }) %>
+    </ul>
+    <p><a href="/rules">看完整規則</a></p>
+    <form method="post" action="/rules/ack">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="return" value="<%= currentPath %>">
+      <button type="submit">我了解</button>
+    </form>
+  </div>
+<% } %>

@@ -1,0 +1,89 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+<main class="wrap narrow">
+  <h1>我的帳號</h1>
+  <p class="meta"><%= user.display_name %> · <%= roleLabel(user.role) %></p>
+  <p class="merit-entry"><a href="/users/<%= user.id %>/merit">功德 <%= formatMerit(user.merit) %></a></p>
+  <p>手機 <strong><%= user.mobile %></strong> 只在帳號頁顯示，公開個人頁看不到。</p>
+  <section class="card" aria-label="大字模式">
+    <h2>大字模式</h2>
+    <p class="hint">字變大、按鈕更好按、對比更高。只存在這支瀏覽器，預設是關的。</p>
+    <button type="button" data-large-text="label" aria-pressed="false">開啟大字模式</button>
+  </section>
+  <form class="last-seen-form" method="post" action="/account/last-seen">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label class="check" for="hide_last_seen">
+      <input id="hide_last_seen" type="checkbox" name="hide_last_seen" value="1" <%= user.hide_last_seen ? 'checked' : '' %>>
+      不顯示我的上線狀態
+    </label>
+    <p class="hint">開啟後，其他人在廣場、貼文和個人頁看不到你的上線狀態。</p>
+    <button type="submit">儲存</button>
+  </form>
+  <form method="post" action="/account">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="field">
+      <label for="city">我的縣市</label>
+      <select class="place-select" id="city" name="city">
+        <option value="">先不設定</option>
+        <% cities.forEach(function (city) { %>
+          <option value="<%= city %>" <%= user.city === city ? 'selected' : '' %>><%= city %></option>
+        <% }) %>
+      </select>
+      <p class="hint">設定之後，首頁會先顯示這個縣市。選「全部」仍看得到其他地方，也看得到還沒填縣市的舊貼文。</p>
+    </div>
+    <div class="field">
+      <label for="district">鄉鎮市區（可以不填）</label>
+      <%- include('partials/district-select', {
+        id: 'district',
+        cityId: 'city',
+        blank: '可以不填',
+        disabled: !user.city,
+        selectedCity: user.city,
+        selectedDistrict: user.district
+      }) %>
+      <p class="hint">只會顯示縣市和鄉鎮市區，不會留下地址。</p>
+    </div>
+    <%- include('partials/slot-picks', {
+      legend: '方便互助時段（可以不選）',
+      picked: parseSlots(user.slots),
+      hint: '跟今日空檔分開。只記方便的時段，可以不選，也不會留下地址。'
+    }) %>
+    <div class="field">
+      <label for="availability">今日空檔</label>
+      <input id="availability" name="availability" maxlength="80" value="<%= user.availability || '' %>" placeholder="例如 今天 14:00–18:00 可以">
+      <p class="hint">會出現在你的公開個人頁和廣場上的貼文旁邊。沒有填就留空。</p>
+    </div>
+    <button type="submit">儲存</button>
+  </form>
+  <form class="watch-picks" method="post" action="/account/watch" data-watch-active="<%= watchActive ? '1' : '0' %>">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <fieldset class="field">
+      <legend>關注的類別（可以不選）</legend>
+      <div class="watch-grid">
+        <label class="choice"><input type="checkbox" name="categories" value="food" <%= watchCategories.indexOf('food') >= 0 ? 'checked' : '' %>> 食物</label>
+        <label class="choice"><input type="checkbox" name="categories" value="transport" <%= watchCategories.indexOf('transport') >= 0 ? 'checked' : '' %>> 交通</label>
+        <label class="choice"><input type="checkbox" name="categories" value="other" <%= watchCategories.indexOf('other') >= 0 ? 'checked' : '' %>> 其他</label>
+      </div>
+    </fieldset>
+    <fieldset class="field">
+      <legend>關注的縣市（可以不選）</legend>
+      <div class="watch-grid">
+        <% cities.forEach(function (city) { %>
+          <label class="choice"><input type="checkbox" name="counties" value="<%= city %>" <%= watchCounties.indexOf(city) >= 0 ? 'checked' : '' %>> <%= city %></label>
+        <% }) %>
+      </div>
+      <p class="hint">沒有儲存關注時，首頁跟以前一樣。有填縣市的話，這裡先幫你勾上，要按下面的儲存才會開始算新貼文。</p>
+    </fieldset>
+    <button type="submit">儲存關注</button>
+  </form>
+  <section class="card" data-spent="<%= week.spent %>" data-received="<%= week.received %>" data-quota-gained="<%= week.quotaGained %>">
+    <h2>本週功德進出</h2>
+    <p class="meta"><%= week.start %> 到 <%= week.end %>（台北時間，週一開始）</p>
+    <p>支出 <%= formatMerit(week.spent) %> · 收入 <%= formatMerit(week.received) %> · 額度增加 <%= formatMerit(week.quotaGained) %></p>
+    <p class="hint">只顯示在你自己的帳號頁，公開個人頁看不到這三個數字。</p>
+  </section>
+  <p><a class="button" href="/users/<%= user.id %>">看公開個人頁</a></p>
+  <p><a class="button" href="/rules">規則與常見問題</a></p>
+  <p><a href="/me">回到我的交易</a></p>
+</main>
+<%- include('partials/footer') %>
