@@ -197,6 +197,13 @@ CREATE TABLE IF NOT EXISTS user_hides (
 
 CREATE INDEX IF NOT EXISTS idx_user_hides_hidden ON user_hides (hidden_user_id);
 
+CREATE TABLE IF NOT EXISTS user_watch_prefs (
+  user_id INTEGER PRIMARY KEY,
+  categories TEXT,
+  counties TEXT,
+  last_checked_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS reports (
   id INTEGER PRIMARY KEY,
   reporter_id INTEGER NOT NULL REFERENCES users(id),
@@ -291,6 +298,12 @@ function migrate(db) {
       CHECK (user_id != hidden_user_id)
     );
     CREATE INDEX IF NOT EXISTS idx_user_hides_hidden ON user_hides (hidden_user_id);
+    CREATE TABLE IF NOT EXISTS user_watch_prefs (
+      user_id INTEGER PRIMARY KEY,
+      categories TEXT,
+      counties TEXT,
+      last_checked_at TEXT
+    );
     CREATE TABLE IF NOT EXISTS announcements (
       id INTEGER PRIMARY KEY,
       author_id INTEGER NOT NULL REFERENCES users(id),

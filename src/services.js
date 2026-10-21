@@ -4,7 +4,7 @@ const { CATEGORIES, ENDOWMENTS, MAX_AMOUNT, RATING_TAGS, MEETING_MODES, PUBLIC_M
 const { taipeiDate, taipeiMonth, taipeiMonthRange, weekRange, lastSeenLabel, LAST_SEEN_INTERVAL_MS } = require('./time');
 const sms = require('./sms');
 const { cleanPassword, hashPassword, verifyPassword, temporaryPassword } = require('./password');
-const { normalizeCity, normalizeDistrict } = require('./places');
+const { CITIES, normalizeCity, normalizeDistrict } = require('./places');
 const { normalizeSlots } = require('./slots');
 const { TEMPLATES } = require('./templates');
 const { meetingShareText, lineShareUrl } = require('./share');
@@ -689,6 +689,117 @@ function createServices(db, options = {}) {
     const slots = normalizeSlots(raw);
     db.prepare('UPDATE users SET slots = ? WHERE id = ?').run(slots, userId);
     return mustUser(userId);
+  }
+
+  function watchTokens(raw) {
+    if (raw == null || raw === '') return [];
+    const list = Array.isArray(raw) ? raw : [raw];
+    return list.flatMap((item) => String(item).split(',')).map((item) => (
+      String(item).replace(/[\u0000-\u001F]/g, '').trim()
+    )).filter(Boolean);
+  }
+
+  function cleanWatchCategories(raw) {
+    const found = new Set();
+    for (const token of watchTokens(raw)) {
+      if (!CATEGORIES[token]) throw new AppError('請選擇食物、交通或其他。');
+      found.add(token);
+    }
+    return Object.keys(CATEGORIES).filter((category) => found.has(category));
+  }
+
+  function cleanWatchCounties(raw) {
+    const found = new Set();
+    for (const token of watchTokens(raw)) {
+      const city = token.replace(/台/g, '臺');
+      if (!CITIES.includes(city)) throw new AppError('請選擇縣市。');
+      found.add(city);
+    }
+    return CITIES.filter((city) => found.has(city));
+  }
+
+  function readWatchPrefs(userId) {
+    const row = db.prepare(`
+      SELECT categories, counties, last_checked_at FROM user_watch_prefs WHERE user_id = ?
+    `).get(userId);
+    if (!row) return { categories: [], counties: [], lastCheckedAt: null, active: false };
+    const categories = String(row.categories || '').split(',').filter((category) => CATEGORIES[category]);
+    const counties = String(row.counties || '').split(',').filter((city) => CITIES.includes(city));
+    return {
+      categories,
+      counties,
+      lastCheckedAt: row.last_checked_at,
+      active: categories.length > 0 || counties.length > 0,
+    };
+  }
+
+  function saveWatchPrefs(userId, rawCategories, rawCounties) {
+    mustUser(userId);
+    const categories = cleanWatchCategories(rawCategories);
+    const counties = cleanWatchCounties(rawCounties);
+    if (!categories.length && !counties.length) {
+      db.prepare('DELETE FROM user_watch_prefs WHERE user_id = ?').run(userId);
+      return { categories: [], counties: [], lastCheckedAt: null, active: false };
+    }
+    const existing = db.prepare('SELECT user_id FROM user_watch_prefs WHERE user_id = ?').get(userId);
+    if (existing) {
+      db.prepare('UPDATE user_watch_prefs SET categories = ?, counties = ? WHERE user_id = ?').run(
+        categories.join(','),
+        counties.join(','),
+        userId,
+      );
+    } else {
+      db.prepare(`
+        INSERT INTO user_watch_prefs (user_id, categories, counties, last_checked_at)
+        VALUES (?, ?, ?, NULL)
+      `).run(userId, categories.join(','), counties.join(','));
+    }
+    return readWatchPrefs(userId);
+  }
+
+  function watchNewCount(userId) {
+    const prefs = readWatchPrefs(userId);
+    if (!prefs.active) return 0;
+    const where = [
+      'p.status = \'open\'',
+      'u.blocked = 0',
+      'p.parent_id IS NULL',
+      '(p.seats <= 1 OR p.filled_count < p.seats)',
+      '(p.expires_at IS NULL OR p.expires_at > ?)',
+      'p.author_id != ?',
+      `NOT EXISTS (
+        SELECT 1 FROM user_hides h
+        WHERE (h.user_id = ? AND h.hidden_user_id = p.author_id)
+           OR (h.hidden_user_id = ? AND h.user_id = p.author_id)
+      )`,
+    ];
+    const params = [clock().toISOString(), userId, userId, userId];
+    if (prefs.lastCheckedAt) {
+      where.push('p.created_at > ?');
+      params.push(prefs.lastCheckedAt);
+    }
+    if (prefs.categories.length) {
+      where.push(`p.category IN (${prefs.categories.map(() => '?').join(', ')})`);
+      params.push(...prefs.categories);
+    }
+    if (prefs.counties.length) {
+      where.push(`p.city IN (${prefs.counties.map(() => '?').join(', ')})`);
+      params.push(...prefs.counties);
+    }
+    return db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM posts p
+      JOIN users u ON u.id = p.author_id
+      WHERE ${where.join(' AND ')}
+    `).get(...params).count;
+  }
+
+  function markWatchChecked(userId) {
+    const prefs = readWatchPrefs(userId);
+    if (!prefs.active) return prefs;
+    const at = clock().toISOString();
+    db.prepare('UPDATE user_watch_prefs SET last_checked_at = ? WHERE user_id = ?').run(at, userId);
+    return readWatchPrefs(userId);
   }
 
   function acceptGroup(postId, userId) {
@@ -1527,6 +1638,20 @@ function createServices(db, options = {}) {
     if (filter.category && CATEGORIES[filter.category]) {
       where.push('p.category = ?');
       params.push(filter.category);
+    }
+    if (Array.isArray(filter.watchCategories) && filter.watchCategories.length) {
+      const categories = filter.watchCategories.filter((category) => CATEGORIES[category]);
+      if (categories.length) {
+        where.push(`p.category IN (${categories.map(() => '?').join(', ')})`);
+        params.push(...categories);
+      }
+    }
+    if (Array.isArray(filter.watchCounties) && filter.watchCounties.length) {
+      const counties = filter.watchCounties.filter((city) => CITIES.includes(city));
+      if (counties.length) {
+        where.push(`p.city IN (${counties.map(() => '?').join(', ')})`);
+        params.push(...counties);
+      }
     }
     if (filter.publicMeeting) {
       where.push(`p.meeting_mode IN (${PUBLIC_MEETING_MODES.map(() => '?').join(', ')})`);
@@ -2474,6 +2599,10 @@ function createServices(db, options = {}) {
     updateAccountPlace,
     updateAvailability,
     updateSlots,
+    readWatchPrefs,
+    saveWatchPrefs,
+    watchNewCount,
+    markWatchChecked,
     acceptPost,
     removeSlot,
     releaseExpiredReservations,

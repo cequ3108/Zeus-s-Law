@@ -375,6 +375,26 @@ form { margin: 12px 0 20px; }
 .filter-fit-hint { grid-column: 1 / -1; margin: 0; }
 .filter-fit-hint a { display: inline-flex; align-items: center; min-height: 48px; }
 .slot-picks .slot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+.watch-card { margin: 0 0 12px; }
+.watch-card button {
+  width: 100%;
+  min-height: 44px;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.45;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.watch-picks .watch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+.watch-picks .choice { display: flex; align-items: center; gap: 8px; min-height: 44px; margin: 0; }
+.watch-picks .choice input { width: 22px; height: 22px; min-height: 22px; margin: 0; flex: 0 0 auto; }
+.watch-picks button { min-height: 44px; }
+.filter-watch { grid-column: 1 / -1; margin: 0; }
+@media (max-width: 560px) {
+  .watch-picks button { width: 100%; }
+}
 .slot-picks .choice { display: flex; align-items: center; gap: 8px; min-height: 48px; margin: 0; }
 .slot-picks .choice input { width: 22px; height: 22px; min-height: 22px; margin: 0; flex: 0 0 auto; }
 .slot-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; vertical-align: middle; }

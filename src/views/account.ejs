@@ -55,6 +55,27 @@
     </div>
     <button type="submit">儲存</button>
   </form>
+  <form class="watch-picks" method="post" action="/account/watch" data-watch-active="<%= watchActive ? '1' : '0' %>">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <fieldset class="field">
+      <legend>關注的類別（可以不選）</legend>
+      <div class="watch-grid">
+        <label class="choice"><input type="checkbox" name="categories" value="food" <%= watchCategories.indexOf('food') >= 0 ? 'checked' : '' %>> 食物</label>
+        <label class="choice"><input type="checkbox" name="categories" value="transport" <%= watchCategories.indexOf('transport') >= 0 ? 'checked' : '' %>> 交通</label>
+        <label class="choice"><input type="checkbox" name="categories" value="other" <%= watchCategories.indexOf('other') >= 0 ? 'checked' : '' %>> 其他</label>
+      </div>
+    </fieldset>
+    <fieldset class="field">
+      <legend>關注的縣市（可以不選）</legend>
+      <div class="watch-grid">
+        <% cities.forEach(function (city) { %>
+          <label class="choice"><input type="checkbox" name="counties" value="<%= city %>" <%= watchCounties.indexOf(city) >= 0 ? 'checked' : '' %>> <%= city %></label>
+        <% }) %>
+      </div>
+      <p class="hint">沒有儲存關注時，首頁跟以前一樣。有填縣市的話，這裡先幫你勾上，要按下面的儲存才會開始算新貼文。</p>
+    </fieldset>
+    <button type="submit">儲存關注</button>
+  </form>
   <section class="card" data-spent="<%= week.spent %>" data-received="<%= week.received %>" data-quota-gained="<%= week.quotaGained %>">
     <h2>本週功德進出</h2>
     <p class="meta"><%= week.start %> 到 <%= week.end %>（台北時間，週一開始）</p>

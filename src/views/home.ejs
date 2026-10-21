@@ -1,6 +1,12 @@
 <%- include('partials/head') %>
 <%- include('partials/header') %>
 <main class="wrap">
+  <% if (user && watchNew) { %>
+    <form class="watch-card" method="post" action="/watch/check" data-watch-new="<%= watchNew %>">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button type="submit">自上次查看後有 <%= watchNew %> 則符合你關注的新貼文</button>
+    </form>
+  <% } %>
   <% if (announcement) { %>
     <aside class="announcement" data-announcement="<%= announcement.id %>" aria-label="站內公告">
       <p>
@@ -58,6 +64,10 @@
     <h1>今天可以接的互助</h1>
     <p>食物、交通，或其他需要。你可以寫「我可以提供」，也可以寫「我需要」。標一個功德金額，最後以雙方認定的較低者結算。</p>
     <form class="filter" method="get" action="/">
+      <% if (filterWatch) { %>
+        <input type="hidden" name="watch" value="1">
+        <p class="hint filter-watch">正在看你關注的類別與縣市。</p>
+      <% } %>
       <div class="field">
         <label for="filter-city">縣市</label>
         <select class="place-select" id="filter-city" name="city">

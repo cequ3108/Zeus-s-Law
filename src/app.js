@@ -200,6 +200,7 @@ function createApp(options = {}) {
     }
     res.locals.actionCount = res.locals.user ? services.pendingActions(res.locals.user.id) : 0;
     res.locals.expiringCount = res.locals.user ? services.expiringSoonCount(res.locals.user.id) : 0;
+    res.locals.watchNew = res.locals.user ? services.watchNewCount(res.locals.user.id) : 0;
     res.locals.ratingReminders = res.locals.user
       ? services.pendingRatings(res.locals.user.id)
       : { total: 0, items: [], day: '' };
@@ -234,6 +235,7 @@ function createApp(options = {}) {
     const post = String(req.path || '').match(/^\/posts\/(\d+)/);
     if (post) return `/posts/${post[1]}`;
     if (req.path === '/account' || req.path.startsWith('/account/')) return '/account';
+    if (req.path === '/watch/check') return '/';
     if (req.path.startsWith('/admin')) return '/admin';
     if (req.path.startsWith('/announcements/')) return '/';
     const personalHide = String(req.path || '').match(/^\/users\/(\d+)\/(?:hide|unhide)$/);
@@ -359,9 +361,11 @@ function createApp(options = {}) {
 
   app.get('/', (req, res) => {
     if (req.query['clear-draft'] === '1') res.locals.clearDraft = 'all';
+    const watchPrefs = res.locals.user ? services.readWatchPrefs(res.locals.user.id) : null;
+    const filterWatch = req.query.watch === '1' && !!(watchPrefs && watchPrefs.active);
     const rawCity = String(req.query.city || '').trim();
     let city = rawCity;
-    if (!rawCity && res.locals.user && res.locals.user.city) city = res.locals.user.city;
+    if (!rawCity && res.locals.user && res.locals.user.city && !filterWatch) city = res.locals.user.city;
     if (rawCity === 'all') city = '';
     let normalized = '';
     if (city) {
@@ -398,6 +402,7 @@ function createApp(options = {}) {
     if (filterLocal) kept.set('local', '1');
     if (filterFit) kept.set('fit', '1');
     if (sort !== 'new') kept.set('sort', sort);
+    if (filterWatch) kept.set('watch', '1');
     const onboarding = res.locals.user ? services.onboardingFor(res.locals.user.id) : null;
     if (onboarding && onboarding.complete) services.dismissOnboarding(res.locals.user.id);
     res.render('home', {
@@ -409,6 +414,8 @@ function createApp(options = {}) {
         localDistrict: filterLocal ? mine.district : null,
         fitSlots: filterFit ? fitSlots : null,
         category: category || null,
+        watchCategories: filterWatch ? watchPrefs.categories : null,
+        watchCounties: filterWatch ? watchPrefs.counties : null,
         publicMeeting,
         query,
         sort,
@@ -420,6 +427,7 @@ function createApp(options = {}) {
       filterDistrict: district,
       filterLocal,
       filterFit,
+      filterWatch,
       filterCategory: category,
       filterPublic: publicMeeting,
       filterQuery: query,
@@ -676,12 +684,33 @@ function createApp(options = {}) {
   });
 
   app.get('/account', requireLogin, (req, res) => {
+    const watch = services.readWatchPrefs(res.locals.user.id);
     res.render('account', {
       title: '我的帳號',
       cities: CITIES,
       districts: DISTRICTS,
       week: services.weeklySummary(res.locals.user.id),
+      watchCategories: watch.categories,
+      watchCounties: watch.active ? watch.counties : (res.locals.user.city ? [res.locals.user.city] : []),
+      watchActive: watch.active,
     });
+  });
+
+  app.post('/account/watch', requireCsrf, requireLogin, (req, res) => {
+    try {
+      const saved = services.saveWatchPrefs(res.locals.user.id, req.body.categories, req.body.counties);
+      redirectWith(req, res, '/account', {
+        type: 'ok',
+        message: saved.active ? '已記下你關注的類別與縣市。' : '已清除關注。首頁不會再提醒。',
+      });
+    } catch (err) {
+      handle(err, req, res, '/account');
+    }
+  });
+
+  app.post('/watch/check', requireCsrf, requireLogin, (req, res) => {
+    services.markWatchChecked(res.locals.user.id);
+    res.redirect('/?watch=1&city=all');
   });
 
   app.post('/account/last-seen', requireCsrf, requireLogin, (req, res) => {
