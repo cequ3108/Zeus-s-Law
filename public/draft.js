@@ -160,7 +160,7 @@
     const notice = doc.querySelector('[data-draft-notice]');
     const clearButton = doc.querySelector('[data-draft-clear]');
     const initial = readForm(form);
-    const draft = load(storage, userId);
+    const draft = form.getAttribute('data-repeat') === '1' ? null : load(storage, userId);
     if (draft) {
       writeForm(form, draft);
       if (notice) notice.hidden = false;

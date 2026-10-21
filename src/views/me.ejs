@@ -99,6 +99,9 @@
           <button type="submit">一鍵重發</button>
         </form>
       <% } %>
+      <% if (post.author_id === dash.user.id && (post.status === 'settled' || post.status === 'cancelled' || post.expired)) { %>
+        <p><a class="button again" href="/posts/new?from=<%= post.id %>">再發一次</a></p>
+      <% } %>
     </article>
   <% }) %>
 </main>

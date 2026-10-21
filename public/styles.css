@@ -437,6 +437,17 @@ button, .button {
   min-height: 44px;
   cursor: pointer;
 }
+a.button.again {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  margin: 8px 0;
+}
+@media (max-width: 560px) {
+  a.button.again { width: 100%; }
+}
 button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
 button.danger { background: var(--seal); }
 button + button, form + form { margin-top: 8px; }

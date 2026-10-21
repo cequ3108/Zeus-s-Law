@@ -574,6 +574,26 @@ function createServices(db, options = {}) {
     }).immediate();
   }
 
+  function repeatSource(postId, userId) {
+    const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
+    if (!post || post.author_id !== userId) return null;
+    const closed = post.status === 'settled' || post.status === 'cancelled' || (post.status === 'open' && isExpired(post));
+    if (!closed) return null;
+    return {
+      id: post.id,
+      kind: post.kind,
+      category: post.category,
+      title: post.title || '',
+      description: post.description,
+      amount: post.amount,
+      city: post.city,
+      district: post.district,
+      meetingMode: post.meeting_mode,
+      meetingPlace: post.meeting_place || '',
+      slots: post.slots,
+    };
+  }
+
   function cancelPost(postId, userId) {
     const changed = db.prepare(`
       UPDATE posts SET status = 'cancelled'
@@ -1507,6 +1527,9 @@ function createServices(db, options = {}) {
       expired,
       canCancel: !!(viewer && viewer.id === row.author_id && row.status === 'open' && !expired),
       canRepost: !!(viewer && viewer.id === row.author_id && row.status === 'open' && expired),
+      canRepeat: !!(viewer && viewer.id === row.author_id && (
+        row.status === 'settled' || row.status === 'cancelled' || expired
+      )),
       canSubmitValue: !!(isParty && row.status === 'matched'),
       canRetrySettle: !!(isParty && row.status === 'matched' && row.host_value != null && row.seeker_value != null),
       meetingPlace: row.meeting_place,
@@ -1946,6 +1969,7 @@ function createServices(db, options = {}) {
     updateSlots,
     acceptPost,
     repostPost,
+    repeatSource,
     cancelPost,
     submitValue,
     retrySettle,

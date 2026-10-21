@@ -16,7 +16,10 @@
     <% if (selected) { %>
       <p class="hint">「<%= selected.label %>」建議 <%= selected.min %>–<%= selected.max %> 功德。金額仍由你自己填，模板只是起點。</p>
     <% } %>
-    <form method="post" action="/posts" data-draft-user="<%= user.id %>">
+    <% if (repeat) { %>
+      <p class="hint">已帶入上一則的內容。期限和約的時間要重填。按下發布才會建立新貼文，原來那則不會改。</p>
+    <% } %>
+    <form method="post" action="/posts" data-draft-user="<%= user.id %>"<% if (repeat) { %> data-repeat="1"<% } %>>
       <input type="hidden" name="_csrf" value="<%= csrf %>">
       <div class="draft-note" data-draft-notice hidden>
         <p>已帶回上次未送出的草稿</p>
@@ -28,29 +31,29 @@
           <input type="hidden" name="kind" value="need">
           <p>福利機構只能發布「我需要」。幫忙的人獲得功德，由機構付出。</p>
         <% } else { %>
-          <label class="choice"><input type="radio" name="kind" value="offer" <%= selected && selected.kind === 'offer' ? 'checked' : '' %> required> 我可以提供</label>
-          <label class="choice"><input type="radio" name="kind" value="need" <%= selected && selected.kind === 'need' ? 'checked' : '' %> required> 我需要</label>
+          <label class="choice"><input type="radio" name="kind" value="offer" <%= (repeat ? repeat.kind : (selected && selected.kind)) === 'offer' ? 'checked' : '' %> required> 我可以提供</label>
+          <label class="choice"><input type="radio" name="kind" value="need" <%= (repeat ? repeat.kind : (selected && selected.kind)) === 'need' ? 'checked' : '' %> required> 我需要</label>
         <% } %>
       </fieldset>
       <div class="field">
         <label for="category">種類</label>
         <select id="category" name="category" required>
           <option value="">請選擇</option>
-          <option value="food" <%= selected && selected.category === 'food' ? 'selected' : '' %>>食物</option>
-          <option value="transport" <%= selected && selected.category === 'transport' ? 'selected' : '' %>>交通</option>
-          <option value="other" <%= selected && selected.category === 'other' ? 'selected' : '' %>>其他</option>
+          <option value="food" <%= (repeat ? repeat.category : (selected && selected.category)) === 'food' ? 'selected' : '' %>>食物</option>
+          <option value="transport" <%= (repeat ? repeat.category : (selected && selected.category)) === 'transport' ? 'selected' : '' %>>交通</option>
+          <option value="other" <%= (repeat ? repeat.category : (selected && selected.category)) === 'other' ? 'selected' : '' %>>其他</option>
         </select>
       </div>
       <div class="field">
         <label for="title">標題（可以不填）</label>
-        <input id="title" name="title" maxlength="40" value="<%= selected ? selected.title : '' %>">
+        <input id="title" name="title" maxlength="40" value="<%= repeat ? repeat.title : (selected ? selected.title : '') %>">
       </div>
       <div class="field">
         <label for="city">縣市</label>
         <select class="place-select" id="city" name="city" required>
           <option value="">請選擇</option>
           <% cities.forEach(function (city) { %>
-            <option value="<%= city %>" <%= user.city === city ? 'selected' : '' %>><%= city %></option>
+            <option value="<%= city %>" <%= (repeat ? repeat.city : user.city) === city ? 'selected' : '' %>><%= city %></option>
           <% }) %>
         </select>
       </div>
@@ -60,19 +63,19 @@
           id: 'district',
           cityId: 'city',
           blank: '可以不填',
-          disabled: !user.city,
-          selectedCity: user.city,
-          selectedDistrict: user.district
+          disabled: !(repeat ? repeat.city : user.city),
+          selectedCity: repeat ? repeat.city : user.city,
+          selectedDistrict: repeat ? repeat.district : user.district
         }) %>
       </div>
       <%- include('partials/slot-picks', {
         legend: '希望時段（可以不選）',
-        picked: parseSlots(user.slots),
+        picked: parseSlots(repeat ? repeat.slots : user.slots),
         hint: '先帶入你帳號上的方便時段。這則可以改，也可以全部取消。'
       }) %>
       <div class="field">
         <label for="amount">標示金額（功德／新台幣）</label>
-        <input id="amount" name="amount" inputmode="numeric" min="1" step="1" required placeholder="<%= selected ? '建議 ' + selected.min + '–' + selected.max : '' %>">
+        <input id="amount" name="amount" inputmode="numeric" min="1" step="1" required value="<%= repeat ? repeat.amount : '' %>" placeholder="<%= selected ? '建議 ' + selected.min + '–' + selected.max : '' %>">
         <p class="hint">約 1 元價值，僅供估價參考。功德不可購買、兌現或轉售。</p>
         <p class="hint">一般使用者若是付出功德的一方，功德減去這個金額後必須大於 0，才接得成。</p>
         <% hints.forEach(function (item) { %>
@@ -88,30 +91,32 @@
         <select id="meeting_mode" name="meeting_mode">
           <option value="">可以不選</option>
           <% meetingModes.forEach(function (mode) { %>
-            <option value="<%= mode %>"><%= mode %></option>
+            <option value="<%= mode %>" <%= repeat && repeat.meetingMode === mode ? 'selected' : '' %>><%= mode %></option>
           <% }) %>
         </select>
       </div>
       <div class="field">
         <label for="meeting_place">約在哪裡（可以不填）</label>
-        <input id="meeting_place" name="meeting_place" maxlength="80" placeholder="例如 公館捷運站 3 號出口">
+        <input id="meeting_place" name="meeting_place" maxlength="80" value="<%= repeat ? repeat.meetingPlace : '' %>" placeholder="例如 公館捷運站 3 號出口">
       </div>
       <div class="field">
         <label for="meeting_time">約什麼時候（可以不填）</label>
-        <input id="meeting_time" name="meeting_time" maxlength="80" placeholder="例如 週六下午三點">
+        <input id="meeting_time" name="meeting_time" maxlength="80" value="" placeholder="例如 週六下午三點">
+        <% if (repeat) { %><p class="hint">約的時間要重填，不會沿用上一則。</p><% } %>
       </div>
       <div class="field">
         <label for="expires_hours">招募多久</label>
-        <select id="expires_hours" name="expires_hours">
+        <select id="expires_hours" name="expires_hours" <%= repeat ? 'required' : '' %>>
+          <% if (repeat) { %><option value="" selected>請選擇</option><% } %>
           <option value="24">24 小時</option>
-          <option value="48" selected>48 小時</option>
+          <option value="48" <%= repeat ? '' : 'selected' %>>48 小時</option>
           <option value="72">72 小時</option>
         </select>
         <p class="hint">時間到了會從廣場消失。你可以在我的交易一鍵重發。</p>
       </div>
       <div class="field">
         <label for="description">描述</label>
-        <textarea id="description" name="description" required maxlength="1000" placeholder="需要什麼、可以提供什麼、在哪個區域、大約什麼時候。"><%= selected ? selected.description : '' %></textarea>
+        <textarea id="description" name="description" required maxlength="1000" placeholder="需要什麼、可以提供什麼、在哪個區域、大約什麼時候。"><%= repeat ? repeat.description : (selected ? selected.description : '') %></textarea>
       </div>
       <button type="submit">發布</button>
     </form>

@@ -702,13 +702,16 @@ function createApp(options = {}) {
 
   app.get('/posts/new', requireLogin, (req, res) => {
     const templates = templatesFor(res.locals.user.role);
-    const hintCity = res.locals.user.city || null;
+    const fromId = parseId(Array.isArray(req.query.from) ? req.query.from[0] : req.query.from);
+    const repeat = fromId ? services.repeatSource(fromId, res.locals.user.id) : null;
+    const hintCity = (repeat && repeat.city) || res.locals.user.city || null;
     res.render('post-new', {
       title: '發布',
       cities: CITIES,
       districts: DISTRICTS,
       templates,
-      selected: findTemplate(String(req.query.template || ''), res.locals.user.role),
+      selected: repeat ? null : findTemplate(String(req.query.template || ''), res.locals.user.role),
+      repeat,
       hints: ['food', 'transport', 'other'].map((category) => ({
         category,
         hint: services.priceHint(category, hintCity),

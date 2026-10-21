@@ -42,6 +42,9 @@
   <% if (model.expiresAt) { %>
     <p class="meta">招募到 <%= formatTaipei(model.expiresAt) %><% if (model.expired) { %>，已過期，廣場上看不到。<% } %></p>
   <% } %>
+  <% if (model.canRepeat) { %>
+    <p><a class="button again" href="/posts/new?from=<%= model.id %>">再發一次</a></p>
+  <% } %>
 
   <% if (model.meetingMode === homeVisitMode) { %>
     <p class="hint home-visit" data-home-visit><%= homeVisitNote %></p>
