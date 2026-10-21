@@ -195,6 +195,7 @@ function createApp(options = {}) {
       else services.touchLastSeen(res.locals.user.id, res.locals.user.last_seen_at);
     }
     res.locals.actionCount = res.locals.user ? services.pendingActions(res.locals.user.id) : 0;
+    res.locals.expiringCount = res.locals.user ? services.expiringSoonCount(res.locals.user.id) : 0;
     res.locals.ratingReminders = res.locals.user
       ? services.pendingRatings(res.locals.user.id)
       : { total: 0, items: [], day: '' };
@@ -861,6 +862,21 @@ function createApp(options = {}) {
     try {
       services.acceptPost(id, res.locals.user.id);
       redirectWith(req, res, back, { type: 'ok', message: '已接下。互助完成後，雙方各自填寫這次值多少。' });
+    } catch (err) {
+      handle(err, req, res, back);
+    }
+  });
+
+  app.post('/posts/:id/extend', requireCsrf, requireLogin, (req, res) => {
+    const id = parseId(req.params.id);
+    const back = req.body && req.body.return === '/me' ? '/me' : (id ? `/posts/${id}` : '/me');
+    if (!id) {
+      res.redirect('/me');
+      return;
+    }
+    try {
+      const result = services.extendPost(id, res.locals.user.id, req.body.days);
+      redirectWith(req, res, back, { type: 'ok', message: `已延長 ${result.days} 天。` });
     } catch (err) {
       handle(err, req, res, back);
     }

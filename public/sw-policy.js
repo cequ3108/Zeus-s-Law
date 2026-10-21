@@ -38,7 +38,7 @@
 
   function isSensitive(pathname) {
     if (SENSITIVE.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) return true;
-    return /\/(settle|value|accept|rating|bookmark|hide|unhide|repost|cancel|report|merit|questions)(\/|$)/.test(pathname);
+    return /\/(settle|value|accept|rating|bookmark|hide|unhide|repost|cancel|report|merit|questions|extend)(\/|$)/.test(pathname);
   }
 
   function shouldHandle(request) {

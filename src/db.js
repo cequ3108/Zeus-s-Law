@@ -71,7 +71,8 @@ CREATE TABLE IF NOT EXISTS posts (
   meeting_place TEXT,
   meeting_time TEXT,
   meeting_mode TEXT,
-  slots TEXT
+  slots TEXT,
+  extended_count INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_posts_status ON posts (status, id);
@@ -258,6 +259,7 @@ function migrate(db) {
   addColumn(db, 'posts', 'meeting_time', 'TEXT');
   addColumn(db, 'posts', 'meeting_mode', 'TEXT');
   addColumn(db, 'posts', 'slots', 'TEXT');
+  addColumn(db, 'posts', 'extended_count', 'INTEGER NOT NULL DEFAULT 0');
   db.exec(`
     CREATE TABLE IF NOT EXISTS user_hides (
       user_id INTEGER NOT NULL REFERENCES users(id),

@@ -64,6 +64,27 @@ function createServices(db, options = {}) {
     return !!(post && post.expires_at && post.expires_at <= clock().toISOString());
   }
 
+  const EXTEND_SOON_MS = 24 * 60 * 60 * 1000;
+  const EXTEND_MAX = 2;
+
+  function isExpiringSoon(post) {
+    if (!post || post.status !== 'open' || !post.expires_at) return false;
+    const at = new Date(post.expires_at).getTime();
+    if (!Number.isFinite(at)) return false;
+    const remain = at - clock().getTime();
+    return remain > 0 && remain < EXTEND_SOON_MS;
+  }
+
+  function canExtendPost(post, userId) {
+    return !!(
+      post && userId && post.author_id === userId
+      && post.status === 'open'
+      && post.expires_at
+      && !isExpired(post)
+      && (post.extended_count || 0) < EXTEND_MAX
+    );
+  }
+
   function assertNoCashLanguage(text) {
     const hit = BANNED_PHRASES.find((phrase) => text.includes(phrase));
     if (hit) throw new AppError(`請不要寫「${hit}」。功德不可購買、兌現或轉售。`);
@@ -604,6 +625,37 @@ function createServices(db, options = {}) {
       meetingPlace: post.meeting_place || '',
       slots: post.slots,
     };
+  }
+
+  function extendPost(postId, userId, rawDays) {
+    const days = Number(rawDays);
+    if (days !== 3 && days !== 7) throw new AppError('只能延長 3 天或 7 天。');
+    const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
+    if (!post) throw new AppError('找不到這則互助。');
+    const actor = mustUser(userId);
+    if (actor.id !== post.author_id) throw new AppError('只有發文者可以延長。');
+    if (post.status !== 'open' || !post.expires_at || isExpired(post)) {
+      throw new AppError('這則已經不能延長。');
+    }
+    if ((post.extended_count || 0) >= EXTEND_MAX) throw new AppError('這則最多只能延長 2 次。');
+    const next = new Date(new Date(post.expires_at).getTime() + days * EXTEND_SOON_MS).toISOString();
+    const changed = db.prepare(`
+      UPDATE posts
+      SET expires_at = ?, extended_count = extended_count + 1
+      WHERE id = ? AND author_id = ? AND status = 'open' AND extended_count < ?
+    `).run(next, post.id, actor.id, EXTEND_MAX);
+    if (changed.changes !== 1) throw new AppError('這則已經不能延長。');
+    return { id: post.id, days, expiresAt: next, extendedCount: (post.extended_count || 0) + 1 };
+  }
+
+  function expiringSoonCount(userId) {
+    const now = clock().toISOString();
+    const soon = new Date(clock().getTime() + EXTEND_SOON_MS).toISOString();
+    return db.prepare(`
+      SELECT COUNT(*) AS count FROM posts
+      WHERE author_id = ? AND status = 'open'
+        AND expires_at IS NOT NULL AND expires_at > ? AND expires_at < ?
+    `).get(userId, now, soon).count;
   }
 
   function cancelPost(postId, userId) {
@@ -1310,7 +1362,7 @@ function createServices(db, options = {}) {
     const nowIso = clock().toISOString();
     const posts = db.prepare(`
       SELECT p.id, p.kind, p.category, p.title, p.description, p.amount, p.status,
-             p.settled_amount, p.created_at, p.expires_at, p.author_id,
+             p.settled_amount, p.created_at, p.expires_at, p.extended_count, p.author_id,
              p.host_id, p.seeker_id, p.host_value, p.seeker_value,
              a.display_name AS author_name, b.display_name AS accepter_name,
              (SELECT COUNT(*) FROM posts c WHERE c.status = 'settled' AND (c.host_id = a.id OR c.seeker_id = a.id)) AS author_completed,
@@ -1332,6 +1384,8 @@ function createServices(db, options = {}) {
         ? milestoneBoard(post.accepter_completed, post.accepter_fives).highest
         : '',
       expired: post.status === 'open' && post.expires_at && post.expires_at <= nowIso,
+      expiringSoon: isExpiringSoon(post),
+      canExtend: canExtendPost(post, userId),
       task: taskFor(post, userId),
     })).sort((a, b) => {
       const rank = (post) => (post.task === '待填估價' || post.task === '待評分' ? 0 : 1);
@@ -1542,6 +1596,9 @@ function createServices(db, options = {}) {
       expired,
       canCancel: !!(viewer && viewer.id === row.author_id && row.status === 'open' && !expired),
       canRepost: !!(viewer && viewer.id === row.author_id && row.status === 'open' && expired),
+      expiringSoon: isExpiringSoon(row),
+      canExtend: canExtendPost(row, viewer && viewer.id),
+      extendedCount: row.extended_count || 0,
       canRepeat: !!(viewer && viewer.id === row.author_id && (
         row.status === 'settled' || row.status === 'cancelled' || expired
       )),
@@ -2086,6 +2143,8 @@ function createServices(db, options = {}) {
     updateSlots,
     acceptPost,
     repostPost,
+    extendPost,
+    expiringSoonCount,
     repeatSource,
     cancelPost,
     submitValue,

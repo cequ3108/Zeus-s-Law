@@ -40,8 +40,9 @@
   <% } %>
 
   <% if (model.expiresAt) { %>
-    <p class="meta">招募到 <%= formatTaipei(model.expiresAt) %><% if (model.expired) { %>，已過期，廣場上看不到。<% } %></p>
+    <p class="meta">招募到 <%= formatTaipei(model.expiresAt) %><% if (model.expired) { %>，已過期，廣場上看不到。<% } %><% if (model.expiringSoon) { %> <span class="tag tag-soon">快到期</span><% } %></p>
   <% } %>
+  <%- include('partials/extend', { canExtend: model.canExtend, postId: model.id, returnTo: '' }) %>
   <% if (model.canRepeat) { %>
     <p><a class="button again" href="/posts/new?from=<%= model.id %>">再發一次</a></p>
   <% } %>

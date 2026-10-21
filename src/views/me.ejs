@@ -88,12 +88,14 @@
         <span>標示 <%= formatMerit(post.amount) %></span>
         <% if (post.settled_amount != null) { %><span>結算 <%= formatMerit(post.settled_amount) %></span><% } %>
         <% if (post.author_id === dash.user.id && post.unanswered) { %><span class="tag tag-task">未回覆 <%= post.unanswered %></span><% } %>
+        <% if (post.author_id === dash.user.id && post.expiringSoon) { %><span class="tag tag-soon">快到期</span><% } %>
       </p>
       <h3><a href="/posts/<%= post.id %><%= post.task === '待評分' ? '#rate' : '' %>"><%= post.title || post.description.slice(0, 42) %></a></h3>
       <p class="meta">
         <%= post.author_name %><%- include('partials/mini-badge', { badge: post.author_badge }) %>
         <% if (post.accepter_name) { %> · <%= post.accepter_name %><%- include('partials/mini-badge', { badge: post.accepter_badge }) %><% } %>
       </p>
+      <%- include('partials/extend', { canExtend: post.canExtend, postId: post.id, returnTo: '/me' }) %>
       <% if (post.expired) { %>
         <form method="post" action="/posts/<%= post.id %>/repost">
           <input type="hidden" name="_csrf" value="<%= csrf %>">
